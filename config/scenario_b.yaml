@@ -1,0 +1,52 @@
+# Scenario B (epilogue, hypothetical): a payload on an in-store TV box, in the three weeks BEFORE the blip. The TV box is how
+# the attacker changes S07's setpoints from inside the store at T0 (config/attack.yaml setpoint_change.from_inside).
+# Fictional: models.example-hub.net and 192.0.2.77 are documentation names and addresses.
+# The data lives in its own data-stream namespace (`epilogue`) and in its own dates, so the main demo's streams,
+# ML baselines and live replay are untouched.
+window:
+  start: "2026-10-22"        # 12 days of normal behaviour first, then the story
+  days: 21                   # ends 2026-11-12 00:00 UTC, the morning of the attack (T0 02:52)
+namespace: epilogue
+store: S07                   # the TV box, its signage players and cameras; the other 19 stores are the peers
+
+download:
+  server_name: models.example-hub.net
+  server_ip: 192.0.2.77
+  first_night: "2026-11-03"
+  nights: 9
+  night_start_utc: "01:30"   # 02:30 in Colmar
+  night_hours: 4
+  total_gib: 4.6             # the 06b query divides by 2^30, so this reads 4.6 GB in the query
+  chunk_mb: [20, 60]
+  chunks: 123
+  ja3: "e7d705a3286e19ea42f587b344ee6865"   # unusual client fingerprint (made up)
+
+# S07 is offline for 48 minutes on one night; Logstash buffers and uploads after it is back.
+offline:
+  night: "2026-11-05"
+  from_utc: "02:10"
+  to_utc: "02:58"
+  upload_utc: "02:59"
+
+# Internal movement, escalating night by night. Never seen before in the store.
+internal_flows:
+  - {name: tvbox-to-signage, src: tv-box, dst: signage-player, port: 8080, from: "2026-11-04", every_minutes: 10}
+  - {name: signage-to-camera, src: signage-player-02, dst: camera, port: 554, from: "2026-11-07", every_minutes: 5}
+  - {name: tvbox-to-manager, src: tv-box, dst: system-manager, port: 80, from: "2026-11-09", every_minutes: 30}
+
+edge:
+  signage_busy_from: "2026-11-08"   # S07-SIG-02 CPU about 97% for the last 4 days, storage filling
+  signage_cpu_busy: 0.97
+  storage_free_start_pct: 62
+  storage_free_end_pct: 8
+  plug_watts_normal: 3.0
+  plug_watts_busy: 6.5              # from the first night
+
+ja3_normal:
+  tv-box: "a0e9f5d64349fb13191bc781f81f42e1"
+  signage-player: "b32309a26951912be7dba376398abc3b"
+  store-server: "c12f54a3f91dc7bafd92cb59fe858a2c"
+server_names:
+  "192.0.2.10": telemetry.vendor-cloud.example
+  "192.0.2.20": cdn.signage-vendor.example
+  "192.0.2.30": update.tvbox-vendor.example

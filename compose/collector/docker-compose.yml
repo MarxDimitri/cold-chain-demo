@@ -1,0 +1,11 @@
+# Central collector: one Elastic Agent enrolled in the cloud Fleet Server. It reads the SQS queue
+# and indexes `detect/` objects. Run `make collector-up` (writes .secrets/collector.env first).
+services:
+  collector:
+    image: docker.elastic.co/elastic-agent/elastic-agent:${ELASTIC_STACK_VERSION:-9.5.6}
+    container_name: coldchain-collector
+    restart: unless-stopped
+    user: root
+    env_file: ../../.secrets/collector.env
+    environment:
+      FLEET_ENROLL: "1"

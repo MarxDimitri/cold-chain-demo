@@ -1,0 +1,73 @@
+# Scenario A. T0 is the replay start (the narrative label "03:52" is not tied to the data).
+# T0 is 02:52 UTC = 03:52 in Colmar (CET) in November, the 4 a.m. line of the story. It sits in a quiet window: the
+# system defrost slots are 05:00, 13:00 and 21:00 UTC (staggered groups run about 2.5 h from each slot, then pull-down),
+# so the last defrost ends around 01:15 UTC and the next starts at 05:00.
+# Backfill history ends 5 minutes before T0; replay rebases these times onto "now".
+t0: "2026-11-12T02:52:00Z"
+attacker_ip: "203.0.113.47"
+contractor_range: "198.51.100.0/24"
+
+# Logins on these 9 stores' system managers at T0-2m20s.
+login_offset_seconds: -140
+touched_stores: [S01, S02, S04, S06, S07, S08, S10, S11, S19]
+
+# 46 cabinets in 3 stores get setpoint -24 -> +50 at T0+5s.
+# The story: the attacker reaches 8 stores' managers from the internet (login from the attacker address), but in S07 the
+# change is made from inside the store: the compromised TV box (see config/scenario_b.yaml) writes the setpoints.
+setpoint_change:
+  offset_seconds: 5
+  new_value: 50.0
+  from_inside: {S07: tv-box}
+  cabinets:
+    S07: {from: C01, to: C16}
+    S11: {from: C01, to: C16}
+    S19: {from: C01, to: C14}
+
+# Variant A2 (replay --scenario defrost, hypothetical): same cabinets and timing, but no setpoint change.
+# The attacker forces defrost with repeated defrost-start commands from the attacker address, which keeps
+# the heaters on past the normal 35-45 minute cycle. The setpoint rule does not fire; the temperature
+# rise, the command source and the out-of-schedule timing do. Warming uses the same calibrated model.
+forced_defrost:
+  offset_seconds: 5
+  repeat_minutes: 8
+
+# Option (replay --spoof, hypothetical): the attacker holds the controller and makes it report normal air
+# temperature and setpoint on the targeted cabinets until the restore. Only the independent probes
+# (coldchain.probe, own uplink) see the real warming, which the divergence rule uses.
+telemetry_spoof:
+  enabled: false
+
+flow:
+  offset_seconds: 11
+  store: S07
+  source_ip: "10.7.0.21"
+
+# ASSUMPTION: calibrated to about +3 C within about 10 minutes. Validate with a refrigeration contractor.
+warming:
+  ambient_c: 18.0
+  rise_c: 3.0
+  rise_minutes: 10
+
+restore:
+  offset_minutes: 10
+  pulldown_minutes: 25
+
+# Act 5: the attacker's first visits, only in the raw history (older than the 35 indexed days). They are the three stores
+# that are hit at T0, in the order the attacker walked in: success, no changes.
+probes:
+  - {store: S07, days_before_t0: 126, time_utc: "02:17:00", user: admin}
+  - {store: S11, days_before_t0: 84, time_utc: "03:41:00", user: admin}
+  - {store: S19, days_before_t0: 49, time_utc: "01:56:00", user: admin}
+
+# Slow warming (hypothetical, only in the ML scoring harness, no replay): an unknown cause such as a failed evaporator
+# fan or a door left open. No audit event, no flow, defrost relay off: the cabinet just runs warmer than it should
+# for a long time. Meant to test duration-based detection, which the 10-minute attack cannot show.
+slow_warming:
+  offset_seconds: 5
+  plateau_c: 1.5          # asymptote above the nominal temperature
+  tau_minutes: 8          # 1.3 K after 16 minutes
+  duration_minutes: 120   # then fixed, and the excess decays over pulldown_minutes
+  pulldown_minutes: 25
+  cabinets:
+    S05: {from: C01, to: C06}
+    S14: {from: C01, to: C06}

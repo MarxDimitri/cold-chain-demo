@@ -1,0 +1,42 @@
+# Fictional chain. No real retailer, store or person. Towns are used only as locations.
+chain:
+  name: "Marché du Rhin (fictional)"
+  hq: Strasbourg
+  distribution_centres: ["DC Nord (Strasbourg)", "DC Sud (Mulhouse)"]
+
+per_store:
+  frozen_cabinets: 16        # C01-C16, setpoint -24 C
+  chilled_cabinets: 8        # C17-C24, setpoint +2 C
+  frozen_setpoint: -24.0
+  chilled_setpoint: 2.0
+  cabinet_model: "EKC 202C"
+  manager_model: "AK-SM 800A"
+  patched_firmware: "4.3.1"
+  vulnerable_firmware: "4.2"
+  signage_players: 2
+  tv_boxes: 1
+  cameras: 3
+
+# 16 stores expose the system manager with the default account and firmware < 4.3.1.
+# Patched stores (internet_facing: false): S13, S15, S16, S18.
+stores:
+  - {id: S01, town: Strasbourg,    region: Alsace, owner: OWN-01, internet_facing: true,  contractor_account: C-101}
+  - {id: S02, town: Schiltigheim,  region: Alsace, owner: OWN-01, internet_facing: true,  contractor_account: C-101}
+  - {id: S03, town: Mulhouse,      region: Alsace, owner: OWN-02, internet_facing: true,  contractor_account: C-114}
+  - {id: S04, town: Haguenau,      region: Alsace, owner: OWN-03, internet_facing: true,  contractor_account: C-102}
+  - {id: S05, town: Sélestat,      region: Alsace, owner: OWN-04, internet_facing: true,  contractor_account: C-114}
+  - {id: S06, town: Saverne,       region: Alsace, owner: OWN-05, internet_facing: true,  contractor_account: C-103}
+  - {id: S07, town: Colmar,        region: Alsace, owner: OWN-03, internet_facing: true,  contractor_account: C-114}
+  - {id: S08, town: Illkirch,      region: Alsace, owner: OWN-06, internet_facing: true,  contractor_account: C-104}
+  - {id: S09, town: Thann,         region: Alsace, owner: OWN-07, internet_facing: true,  contractor_account: C-114}
+  - {id: S10, town: Wissembourg,   region: Alsace, owner: OWN-07, internet_facing: true,  contractor_account: C-105}
+  - {id: S11, town: Kehl,          region: Baden,  owner: OWN-08, internet_facing: true,  contractor_account: C-114}
+  - {id: S12, town: Offenburg,     region: Baden,  owner: OWN-09, internet_facing: true,  contractor_account: C-114}
+  - {id: S13, town: Freiburg,      region: Baden,  owner: OWN-02, internet_facing: false, contractor_account: C-106}
+  - {id: S14, town: Lahr,          region: Baden,  owner: OWN-10, internet_facing: true,  contractor_account: C-114}
+  - {id: S15, town: Baden-Baden,   region: Baden,  owner: OWN-11, internet_facing: false, contractor_account: C-107}
+  - {id: S16, town: Rastatt,       region: Baden,  owner: OWN-11, internet_facing: false, contractor_account: C-108}
+  - {id: S17, town: Emmendingen,   region: Baden,  owner: OWN-12, internet_facing: true,  contractor_account: C-109}
+  - {id: S18, town: Lörrach,       region: Baden,  owner: OWN-06, internet_facing: false, contractor_account: C-110}
+  - {id: S19, town: Karlsruhe,     region: Baden,  owner: OWN-08, internet_facing: true,  contractor_account: C-111}
+  - {id: S20, town: Müllheim,      region: Baden,  owner: OWN-12, internet_facing: true,  contractor_account: C-112}

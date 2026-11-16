@@ -1,0 +1,48 @@
+# Defrost model for the EKC 202C controllers (frozen cabinets).
+# One source of truth: the generator (telemetry and audit events) and the knowledge base (lookup.py) read this file.
+#
+# `manual` holds short paraphrased facts from the public Danfoss EKC 202A/B/C instructions, RI8KL45J (08/2010),
+# parameter survey on p.3 (document 084R9976, SW 1.3x). Values for other firmware editions may differ.
+# `chain` is what this fictional chain configured, always inside the documented ranges.
+# Assumptions (not manual facts) are marked `assumption: true`.
+source: "Danfoss EKC 202A/B/C instructions RI8KL45J (08/2010), p.3"
+
+manual:
+  d01: {name: "Defrost method", values: "none / electric (EL) / gas", factory: "EL"}
+  d02: {name: "Defrost stop temperature", unit: "°C", min: 0, max: 25, factory: 6}
+  d03: {name: "Interval between defrost starts", unit: "hours", min: 0, max: 48, factory: 8}
+  d04: {name: "Maximum defrost duration", unit: "min", min: 0, max: 180, factory: 45}
+  d05: {name: "Time displacement of defrost cut-in at start-up", unit: "min", min: 0, max: 240, factory: 0}
+  d06: {name: "Drip-off time", unit: "min", min: 0, max: 60, factory: 0}
+  d07: {name: "Delay for fan start after defrost", unit: "min", min: 0, max: 60, factory: 0}
+  d10: {name: "Defrost sensor (0 = time, 1 = S5, 2 = Sair)", min: 0, max: 2, factory: 0}
+  d18: {name: "Maximum aggregate refrigeration time between two defrosts (0 = off)", unit: "hours", min: 0, max: 48, factory: 0}
+  A12: {name: "Delay for temperature alarm after defrost", unit: "min", min: 0, max: 240, factory: 90}
+  t01_t06: {name: "Six clock start times for defrost (hours t01-t06, minutes t11-t16; 0 = off)", factory: "off"}
+
+chain:
+  slots_utc: ["05:00", "13:00", "21:00"]   # three clock starts = an 8 h interval, the factory d03
+  duration_minutes: [35, 45]               # inside the factory maximum d04 = 45 min
+  start_jitter_minutes: 5                  # defrost start varies a little around its slot
+  cabinet_offset_minutes: 2                # cabinets of one group start within +-2 min of each other (coordinated start)
+  # Defrost groups: the manual gives the tools (d05 start displacement, coordinated defrost over the network with
+  # a hold of up to o16 = 20 min), not a store layout. Splitting the frozen cabinets into groups that defrost one
+  # after the other, so the rack is not unloaded all at once, is common refrigeration practice. assumption: true
+  groups: 4                                # defrost groups per store
+  group_size: 4                            # frozen cabinets per defrost group (contiguous, like a circuit)
+  group_offset_minutes: 45                 # each group starts 45 min after the previous one: 0, 45, 90, 135
+  store_stagger_minutes: 40                # each store shifts its whole schedule by 0-39 min (store number based)
+  # Two sensors. The evaporator (defrost sensor S5, `d10`) swings from about -30 C to the stop temperature d02
+  # (6 to 8 C), about 40 K. The cabinet air (Sair, the channel the alarms and rules read) rises far less, because the
+  # evaporator is behind a drip tray and the fans are off. The air rise is an assumption to validate with a contractor.
+  air_rise_k: [8, 14]                      # peak of the air above its setpoint during a defrost (assumption: true)
+  evaporator:
+    offset_k: -8                           # evaporator runs this far below the air when refrigerating
+    stop_c: [6, 8]                         # reaches d02 and ends the heating phase
+    tau_min: 6                             # recovery after the defrost
+  expected:                                # kb.expected ranges used by the limits rules
+    d02: [6, 8]
+    d03: [6, 12]
+    d04: [30, 60]
+    d06: [0, 10]
+    A12: [60, 120]

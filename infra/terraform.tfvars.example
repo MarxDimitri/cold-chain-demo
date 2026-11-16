@@ -1,0 +1,19 @@
+# Copy to infra/terraform.tfvars (git-ignored) and adjust. `make setup-aws` picks it up.
+
+# AWS CLI profile (SSO or similar). Leave unset to use the default credential chain.
+profile = "my-aws-profile"
+
+# Keep this the same region as the Elastic Cloud deployment.
+region = "eu-central-1"
+
+# Bucket names are global: a random suffix is appended to this prefix.
+bucket_prefix = "coldchain"
+
+# Governance-mode retention in days. Short on purpose, so teardown stays possible.
+object_lock_days = 7
+
+# Resource tags. The defaults are the demo author's: they come from the Elastic SA sandbox policy, which denies creates
+# without them. Use your own values (your tagging policy, if any), and a lease end 30 to 90 days out.
+project_tag = "yourname-coldchain"
+team        = "your_team"
+keep_until  = "2027-01-31"

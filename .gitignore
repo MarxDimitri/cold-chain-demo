@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+out/
+.terraform/
+*.tfstate
+*.tfstate.*
+store-keys.json
+.DS_Store
+.secrets/
+infra/terraform.tfvars
+.ml-scoring/
+.replay/
+out-b/
+docs/*.pptx
