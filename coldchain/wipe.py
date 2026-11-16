@@ -29,7 +29,7 @@ OLD_DASHBOARDS = ["coldchain-act1-estate", "coldchain-act4-evidence"]
 RULES = ["coldchain-limits", "coldchain-warm-no-defrost", "coldchain-first-seen-peer"]
 STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-signage.cms-*", "logs-power.plug-*"]
 TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-signage.cms", "logs-power.plug")
-INDEX_PATTERNS = ["kb-*", "cc-history-audit*", "cc-hunt-findings", "test-coldchain-*", "zzcheck*"]
+INDEX_PATTERNS = ["kb-*", "cc-history-audit*", "cc-hunt-findings", "cc-esql-moment", "test-coldchain-*", "zzcheck*"]
 PIPELINES = ["coldchain-route", hunt.PIPELINE]
 H = {"x-elastic-internal-origin": "Kibana", "elastic-api-version": "2023-10-31"}
 

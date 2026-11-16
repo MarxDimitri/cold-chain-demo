@@ -134,7 +134,7 @@ hunt-run:
 # ======================================================================================================================
 # Runbook targets: see README.md for the order, the prerequisites and what each step needs.
 # ======================================================================================================================
-.PHONY: help setup backfill backfill-epilogue federation federation-check epilogue baselines content verify teardown teardown-elastic \
+.PHONY: help setup backfill backfill-epilogue federation federation-check epilogue baselines sources content verify teardown teardown-elastic \
         clean-raw hunt-clear reset-demo
 
 help:
@@ -143,11 +143,12 @@ help:
 	@echo "  make setup                   AWS (Terraform), Elastic side, collector, federation data source"
 	@echo "  make backfill                12 months raw + 35 days indexed history to S3 (long, restartable)"
 	@echo "  make backfill-epilogue       scenario B (the TV box) to S3"
-	@echo "  make baselines epilogue content   knowledge base baselines, epilogue ML and rule, dashboards, rules, agent, hunt"
+	@echo "  make baselines epilogue      knowledge base baselines, epilogue ML and rule"
 	@echo "  make history-frozen          Act 3b (needs a frozen node on the deployment)"
+	@echo "  make sources content         the source catalog (Act 0), then dashboards, rules, agent, hunt"
 	@echo "  make verify                  infrastructure, pipeline, federation, dashboards, agent checks"
 	@echo "A demo:        make demo (live, 1x) | make rehearse (hands-off) | make restore (in a second terminal)"
-	@echo "Between runs:  make reset-demo SINCE=<UTC time you started the demo> [DELETE=1]"
+	@echo "Between runs:  make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"
 	@echo "Tear down:     make teardown   (the Elastic Cloud deployment itself is yours to delete)"
 
 # AWS (Terraform), then the Elastic side, then the collector, then the federation data source. Needs .env filled in (README step 3).
@@ -158,7 +159,9 @@ backfill:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.backfill --target s3 --resume
 
 backfill-epilogue:
-	set -a; . ./.env; set +a; $(PY) -m coldchain.scenario_b --target s3 --resume
+	# No --resume on purpose: scenario B reuses the object keys of the main backfill for the same store and hour (netflow.summary,
+	# and S07's netflow.log), and --resume would skip them, leaving the epilogue streams about a third short.
+	set -a; . ./.env; set +a; $(PY) -m coldchain.scenario_b --target s3
 
 # The data source and datasets only: a check needs files under raw/, so it is `make federation-check` after the backfill.
 federation:
@@ -170,6 +173,11 @@ federation-check:
 # After the detect/ history is indexed (the collector drains the queue): what is normal for the Act 2 tiles.
 baselines:
 	$(PY) -m coldchain.baselines
+
+# Act 0 and the "one question, three places" panel: measures every source (the raw files are counted in place, about 5 minutes)
+# and the same question against the live index, the frozen tier and the raw files. Run after history-frozen and both backfills.
+sources:
+	$(PY) -m coldchain.sources
 
 # Scenario B: ML jobs and datafeeds over the epilogue window, and the new-terms rule (created disabled).
 epilogue:
@@ -195,9 +203,10 @@ hunt-clear:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.hunt clear
 
 # Everything a run leaves behind: indexed data, alerts, hunt findings, and (listed, deleted with DELETE=1) the raw files.
-# SINCE is the time you started the demo, not T0. With DELETE=1 the frozen copy of the history is rebuilt afterwards.
+# SINCE is the replay's start (T0 minus 3 minutes; the run prints it): after the pre-roll, so the day of context stays.
+# With DELETE=1 the frozen copy of the history is rebuilt afterwards.
 reset-demo:
-	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<UTC time you started the demo> [DELETE=1]"; exit 1)
+	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"; exit 1)
 	$(MAKE) clean-run SINCE=$(SINCE)
 	$(MAKE) hunt-clear
 	$(MAKE) clean-raw SINCE=$(SINCE) $(if $(DELETE),DELETE=1)

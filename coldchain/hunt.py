@@ -42,6 +42,7 @@ finding, with the earliest time). The key is exactly `<type>:<store>` with the t
 group of stores use their ids joined with `+`, in order): first-visit, setpoint-change, forced-defrost, warm-cabinets,
 tv-box-download, internal-pivot, exposed-controllers. Examples: `first-visit:S07`, `setpoint-change:S11`,
 `exposed-controllers:S03+S05+S09+S12+S14`. The same finding must get the same key on every run.
+List in `tools` the ids of the tools whose results support each finding (for example `cc_history_of_address`).
 Keep the text short, it is shown in a dashboard table: title at most 70 characters, proposed_action at most 120,
 why_abnormal at most 200 and evidence at most 250 (numbers and times, no sentences repeated from the title).
 Severity: critical when something changed a setpoint or a device acts from inside a store, high for a first visit or exposed
@@ -60,12 +61,13 @@ SCHEMA = {
                 "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
                 "category": {"type": "string", "enum": ["outside-access", "temperature", "device-behaviour", "exposure"]},
                 "stores": {"type": "array", "items": {"type": "string"}},
+                "tools": {"type": "array", "items": {"type": "string"}, "description": "Ids of the tools whose results support this finding"},
                 "entities": {"type": "array", "items": {"type": "string"}, "description": "IP addresses, hosts, devices"},
                 "evidence": {"type": "string", "description": "What the tools returned, with numbers and times, at most 250 characters"},
                 "why_abnormal": {"type": "string", "description": "At most 200 characters"},
                 "proposed_action": {"type": "string", "description": "At most 120 characters"},
             },
-            "required": ["key", "title", "severity", "category", "stores", "evidence", "why_abnormal", "proposed_action"],
+            "required": ["key", "title", "severity", "category", "stores", "tools", "evidence", "why_abnormal", "proposed_action"],
         }},
     },
     "required": ["summary", "findings"],
@@ -109,6 +111,7 @@ steps:
             category: "{{{{ foreach.item.category }}}}"
             stores: "{{{{ foreach.item.stores | json }}}}"
             entities: "{{{{ foreach.item.entities | json }}}}"
+            tools: "{{{{ foreach.item.tools | json }}}}"
             evidence: "{{{{ foreach.item.evidence }}}}"
             why_abnormal: "{{{{ foreach.item.why_abnormal }}}}"
             proposed_action: "{{{{ foreach.item.proposed_action }}}}"
@@ -124,16 +127,17 @@ def setup_index() -> None:
         {"set": {"field": "@timestamp", "value": "{{_ingest.timestamp}}", "if": "ctx['@timestamp'] == null"}},
         {"json": {"field": "stores", "target_field": "stores", "ignore_failure": True}},
         {"json": {"field": "entities", "target_field": "entities", "ignore_failure": True}},
+        {"json": {"field": "tools", "target_field": "tools", "ignore_failure": True}},
         {"script": {"lang": "painless", "ignore_failure": True, "source":
                     "ctx.risk = ctx.severity == 'critical' ? 95 : ctx.severity == 'high' ? 75 : ctx.severity == 'medium' ? 50 : 25"}}])
     if es.indices.exists(index=INDEX):
-        es.indices.put_mapping(index=INDEX, properties={"risk": {"type": "integer"}})
+        es.indices.put_mapping(index=INDEX, properties={"risk": {"type": "integer"}, "tools": {"type": "keyword"}})
     else:
         es.indices.create(index=INDEX, settings={"index.default_pipeline": PIPELINE}, mappings={"properties": {
             "@timestamp": {"type": "date"}, "key": {"type": "keyword"}, "title": {"type": "text"},
             "severity": {"type": "keyword"}, "category": {"type": "keyword"}, "stores": {"type": "keyword"},
             "entities": {"type": "keyword"}, "evidence": {"type": "text"}, "why_abnormal": {"type": "text"},
-            "proposed_action": {"type": "text"}, "summary": {"type": "text"}, "status": {"type": "keyword"}, "risk": {"type": "integer"}}})
+            "proposed_action": {"type": "text"}, "summary": {"type": "text"}, "status": {"type": "keyword"}, "risk": {"type": "integer"}, "tools": {"type": "keyword"}}})
 
 
 def _find(s, url) -> str | None:

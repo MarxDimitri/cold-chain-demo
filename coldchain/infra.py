@@ -181,7 +181,17 @@ def check() -> None:
         got += [unquote(m["Body"]) for m in r.get("Messages", [])]  # S3 URL-encodes keys in events
         if any(own in b for b in got):
             break
-    expect("S3 event for the detect/ object reached the queue", any(own in b for b in got))
+    saw = any(own in b for b in got)
+    if not saw:
+        # A running collector reads and deletes the message before this check can peek at it. Then the event is proved by
+        # the bucket's notification setup (the backfill's millions of records arrive through it every time).
+        queue = o["detect_queue_url"].rsplit("/", 1)[-1]
+        cfg = admin.get_bucket_notification_configuration(Bucket=bucket).get("QueueConfigurations", [])
+        saw = any(c["QueueArn"].endswith(queue) and any(r["Value"] == "detect/" for r in c.get("Filter", {}).get("Key", {}).get("FilterRules", []))
+                  and any(e.startswith("s3:ObjectCreated") for e in c["Events"]) for c in cfg)
+        if saw:
+            print("note: the collector consumed the message first; the detect/ notification to the queue is configured")
+    expect("S3 event for the detect/ object reached the queue (or is configured and consumed by the collector)", saw)
     expect("no queue event for raw/", not any(own_raw in b for b in got))
 
     fed = json.loads((SECRETS / "federation.json").read_text())

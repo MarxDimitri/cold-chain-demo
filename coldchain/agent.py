@@ -46,16 +46,19 @@ TOOLS = [
 | STATS logins = COUNT(*), first_seen = MIN(@timestamp) BY retail.store.id, ip
 | SORT first_seen"""},
     {"id": "cc_warm_cabinets",
-     "description": "Cabinets that are warm right now: more than 2 K above their nominal temperature in at least 3 of the last 10 "
-                    "minutes of data, defrost relay off. Per store: how many cabinets and the largest rise.",
+     "description": "Cabinets that are warm right now with no defrost to explain it: more than 2 K above their nominal temperature "
+                    "in at least 3 of the last 10 minutes of data, defrost relay off, and no defrost relay reading in the last hour "
+                    "(the logic of detection rule 2: a cabinet still recovering from a defrost is not listed). Per store: how many "
+                    "cabinets and the largest rise.",
      "params": {},
      "query": f"""FROM metrics-coldchain.case-default
 | WHERE @timestamp > NOW() - 1 day AND @timestamp <= NOW()
 | INLINE STATS newest = MAX(@timestamp)
-| WHERE @timestamp >= newest - 10 minutes
+| WHERE @timestamp >= newest - 60 minutes
 | EVAL rise = coldchain.case.temperature.air - {NOMINAL}
-| STATS late_warm = COUNT(*) WHERE rise > 2 AND coldchain.case.defrost.active == false, peak = MAX(rise) BY device.id, retail.store.id
-| WHERE late_warm >= 3
+| STATS late_warm = COUNT(*) WHERE @timestamp >= newest - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false,
+        relay_on = COUNT(*) WHERE coldchain.case.defrost.active == true, peak = MAX(rise) BY device.id, retail.store.id
+| WHERE late_warm >= 3 AND relay_on == 0
 | STATS warm_cabinets = COUNT(*), largest_rise_k = ROUND(MAX(peak), 1) BY retail.store.id
 | SORT warm_cabinets DESC"""},
     {"id": "cc_history_of_address",

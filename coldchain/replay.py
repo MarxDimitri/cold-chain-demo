@@ -164,6 +164,8 @@ class Replay:
         TRIGGER.unlink(missing_ok=True)
         print(f"replay: T0={iso(self.t0)} scenario={self.scenario}{' +spoof' if self.spoof else ''} "
               f"speed={a.speed}x restore={a.restore} target={a.target}", flush=True)
+        if a.target == "s3":
+            print(f"afterwards: make reset-demo SINCE={iso(self.start)} DELETE=1   (SINCE keeps the pre-roll, removes the run)", flush=True)
 
         series_start = self.begin - 600
         minutes = (self.end - series_start) // 60 + 6

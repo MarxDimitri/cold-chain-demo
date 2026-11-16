@@ -45,7 +45,7 @@ def client() -> Elasticsearch:
             k, v = line.split("=", 1)
             os.environ.setdefault(k, v)
     return Elasticsearch(os.environ["ELASTICSEARCH_URL"], api_key=os.environ["ELASTIC_API_KEY"],
-                         request_timeout=60)
+                         request_timeout=300)
 
 
 def kw(**extra):

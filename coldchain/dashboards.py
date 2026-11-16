@@ -123,6 +123,48 @@ def lines(d: Dash, title: str, q: str, x_col: str, y_cols: list[str], w: int = 4
     d.add(title, cfg, w, h, x, query=q, params=params)
 
 
+# --- Act 0: every source of truth, one language ----------------------------------------------------------------------
+
+TIER_COLORS = {"Indexed": "#6092C0", "Frozen tier": "#9170B8", "Raw in S3": "#54B399", "Knowledge base": "#F5A700", "Produced": "#D36086"}
+ALL_TIME = {"from": "now-10y", "to": "now"}  # these panels read a catalog without @timestamp: the picker must not matter
+
+
+def act0() -> Dash:
+    d = Dash("coldchain-act0-sources", "CC Act 0: Every source of truth, one language",
+             "Every dataset the demo uses, in five tiers, all read with ES|QL. Counts measured with `make sources`. Synthetic data.",
+             time=("now-24h", "now"))
+    d.panels.append(md("## Act 0: every source of truth, one language\n"
+                       "Telemetry, audit, network flows, a year of raw history in S3, the knowledge base, and what the agent finds: "
+                       "different shapes, different storage, different cost. **One platform and one language, ES|QL**, reads all of them, "
+                       "so you can ask a question nobody modelled in advance. Every tile, chart and table on this page is an ES|QL query "
+                       "(raw files are counted once with `make sources`).\n\n"
+                       "```\nFROM logs-coldchain.audit-default   // live index: 35 days, milliseconds\n"
+                       "FROM cc-history-audit             // frozen tier: 12 months, about a second\n"
+                       "FROM raw_store_audit              // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
+                       "FROM kb-assets | ...              // the knowledge base: context joined to any of them\n```", h=9, d=d))
+    d.row(9)
+    for i, tier in enumerate(TIER_COLORS):
+        q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
+        d.add(tier, {"type": "metric", "data_source": esql(q), "time_range": ALL_TIME, "metrics": [
+            {"type": "primary", "column": "rows", "label": " ", "color": {"type": "static", "color": TIER_COLORS[tier]}},
+            {"type": "secondary", "column": "sources", "label": "sources"}]}, 9, 6, 1 + 9 * i, query=q)
+    d.row(6)
+    q = "FROM kb-sources | WHERE rows > 0 | EVAL size = ROUND(LOG10(rows), 2) | SORT size DESC | KEEP source, tier, size"
+    lines(d, "How big: orders of magnitude of rows (log10)", q, "source", ["size"], w=24, h=14, by="tier", kind="bar", ytitle="log10 rows")
+    d.panels[-1]["config"]["time_range"] = ALL_TIME
+    q = "FROM kb-sources | WHERE days IS NOT NULL | SORT days DESC | KEEP source, tier, days"
+    lines(d, "How far back each source reaches (days)", q, "source", ["days"], w=24, h=14, x=24, by="tier", kind="bar", ytitle="days")
+    d.panels[-1]["config"]["time_range"] = ALL_TIME
+    d.row(14)
+    q = ("FROM kb-sources | SORT tier_order, rows DESC | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd\", first_seen), last_seen = DATE_FORMAT(\"yyyy-MM-dd\", last_seen) "
+         "| KEEP tier, source, what, rows, first_seen, last_seen, ask_with")
+    cols = [("tier", 120), ("source", 250), ("what", 640), ("rows", 110), ("first_seen", 100), ("last_seen", 100), ("ask_with", 380)]
+    d.add("Where each source lives and how to ask it", {"type": "data_table", "time_range": ALL_TIME, "data_source": esql(q),
+          "metrics": [{"column": c, "width": w} for c, w in cols]}, 48, 17, query=q)
+    d.row(17)
+    return d
+
+
 # --- Act 1: the estate -------------------------------------------------------------------------------------------
 
 CONTRACTOR_CABINET = "S07-C05"  # one of the 46 attacked cabinets: what the contractor's portal shows
@@ -308,7 +350,7 @@ def act5() -> Dash:
              "A year of raw store audit read in place from S3 by ES|QL data federation (experimental). Synthetic data.",
              time=("now-1y", "now"))
     d.panels.append(md("## Act 3a: four months of silence, then the blip\n**Federation, experimental.** A year of raw store audit, "
-                       "read in place from S3 and never ingested, and the live blip from today's indexed audit. The history takes about 40 seconds. "
+                       "read in place from S3 and never ingested, and the live blip from today's indexed audit. The history takes about 75 seconds. "
                        "Each bar is the number of stores per week: the attacker's first login to a store, and the stores whose "
                        "setpoints were then changed to +50. The chart has its own one-year range, so the time picker does not matter here.", h=5, d=d))
     d.row(5)
@@ -321,10 +363,17 @@ def act5() -> Dash:
                   "time_range": {"from": "now-1y", "to": "now"}}, 48, 16, query=HISTORY)
     d.queries.append((title + " (blip layer)", BLIP, {}))
     d.row(16)
+    d.panels.append(md("### The query behind the history layer\nOne language, any source: this is the whole question, in ES|QL. Change only the "
+                       "`FROM` line and it runs on the frozen copy (Act 3b) or on the live index.\n\n```\n" + HISTORY + "\n```", h=11, d=d))
+    d.row(11)
     return d
 
 
 # --- Act 5b: the same history, ingested and kept on the frozen tier -----------------------------------------------
+
+from .sources import QUESTION  # noqa: E402
+
+QUESTION_TEXT = QUESTION.format(src="<source>").replace(" | ", "\n| ")
 
 OUTSIDE_FROZEN = ('WHERE event.action == "logged-in" AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24") '
                   'AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")')
@@ -341,7 +390,7 @@ def act5b() -> Dash:
              "The same year of store audit as Act 3a, ingested once and kept on the frozen tier. Synthetic data.",
              time=("now-1y", "now"))
     d.panels.append(md("## Act 3b: the same year, ingested, on the frozen tier\n**Your choice.** Act 3a reads the files in place: "
-                       "nothing ingested, about 40 seconds a question (federation, experimental). Here the same history is indexed once, "
+                       "nothing ingested, about 75 seconds a question (federation, experimental). Here the same history is indexed once, "
                        "stored as a searchable snapshot in object storage and served from the frozen tier: about a second the first time, "
                        "a tenth of a second after that. The spend stays controlled because it is fixed by the size of the frozen node and "
                        "the object storage under it, not by how often you ask.", h=5, d=d))
@@ -364,6 +413,19 @@ def act5b() -> Dash:
           "source = source.ip | SORT first_seen | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen) "
           "| KEEP first_seen, store, source, logins", ["first_seen", "store", "source", "logins"], h=9)
     d.row(9)
+    d.panels.append(md("## One question, three places\nThe same ES|QL, word for word, asked of three places: only the `FROM` changes. "
+                       "The live index holds 35 days, so it cannot see the attacker's first visits. The frozen tier and the raw files can, "
+                       "at very different speed and cost. Measured with `make sources`; repeat runs on the frozen tier come from its cache.\n\n"
+                       "```\n" + QUESTION_TEXT + "\n```", h=9, d=d))
+    d.row(9)
+    q = "FROM cc-esql-moment | SORT order | EVAL seconds = ROUND(seconds, 1) | KEEP place, ask_with, seconds, stores_found, answer"
+    d.add("The same question, three places", {"type": "data_table", "time_range": ALL_TIME, "data_source": esql(q), "metrics": [
+        {"column": c, "width": w} for c, w in (("place", 150), ("ask_with", 330), ("seconds", 90), ("stores_found", 120), ("answer", 600))]},
+        28, 8, query=q)
+    q = "FROM cc-esql-moment | SORT order | KEEP place, seconds"
+    lines(d, "Seconds to answer", q, "place", ["seconds"], w=20, h=8, x=28, kind="bar", ytitle="seconds")
+    d.panels[-1]["config"]["time_range"] = ALL_TIME
+    d.row(8)
     for p in d.panels:  # these panels have their own one-year range: the time picker does not matter
         if p["type"] == "vis":
             p["config"]["time_range"] = {"from": "now-1y", "to": "now"}
@@ -390,8 +452,8 @@ def hunt() -> Dash:
     risk = {"type": "dynamic", "range": "absolute", "steps": [
         {"lt": 60, "color": "#6092C0"}, {"gte": 60, "lt": 85, "color": AMBER}, {"gte": 85, "color": RED}]}
     q = ("FROM cc-hunt-findings | SORT risk DESC, @timestamp DESC | EVAL seen = DATE_FORMAT(\"HH:mm\", @timestamp) "
-         "| KEEP seen, risk, severity, stores, title, proposed_action")
-    cols = [("seen", 70), ("risk", 70), ("severity", 90), ("stores", 260), ("title", 500), ("proposed_action", 740)]
+         "| KEEP seen, risk, severity, stores, title, tools, proposed_action")
+    cols = [("seen", 70), ("risk", 70), ("severity", 90), ("stores", 220), ("title", 440), ("tools", 230), ("proposed_action", 610)]
     d.add("Findings, most severe first", {"type": "data_table", "data_source": esql(q), "metrics": [
         {"column": c, "width": w, **({"apply_color_to": "background", "color": risk} if c == "risk" else {})} for c, w in cols]},
         48, 12, query=q)
@@ -403,10 +465,25 @@ def hunt() -> Dash:
             {"column": c, "width": w, **({"apply_color_to": "background", "color": risk} if c == "risk" else {})} for c, w in cols]},
             48, 10, query=q)
         d.row(10)
+    from .agent import TOOLS  # the questions the agent can ask: each one is an ES|QL query over the same data
+
+    def tool_md(tools: list[dict]) -> str:
+        return "".join(f"**`{t['id']}`**: {t['description']}\n\n```\n{t['query'].strip()}\n```\n\n" for t in tools)
+    d.panels.append(md("## What the agent asks: ES|QL, over every source\nThe agent has no private access to the data. Each tool is one ES|QL "
+                       "query over the indexed data, the raw history read in place and the knowledge base: the same language an analyst "
+                       "would type. The `tools` column above says which of these each finding came from.", h=4, d=d))
+    d.row(4)
+    half = (len(TOOLS) + 1) // 2
+    d.panels.append(md(tool_md(TOOLS[:half]), w=24, h=30, d=d))
+    d.panels.append(md(tool_md(TOOLS[half:]), w=24, h=30, d=d, x=24))
+    d.row(30)
     return d
 
 
-DASHBOARDS = {f().id: f for f in (act1a, act1, act5, act5b, epilogue, hunt)}
+# Ids are listed, not read from the builders: `hunt` imports the agent, which imports this module.
+DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
+              "coldchain-act5a-history": act5, "coldchain-act5b-history-frozen": act5b, "coldchain-epilogue-edge": epilogue,
+              "coldchain-hunt-findings": hunt}
 
 
 # --- push / check ------------------------------------------------------------------------------------------------

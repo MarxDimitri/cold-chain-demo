@@ -14,6 +14,7 @@ measurements in [docs/decisions.md](docs/decisions.md).
 
 | Dashboard (Kibana) | Shows | Picker |
 |---|---|---|
+| CC Act 0: Every source of truth, one language | every dataset in five tiers, all read with ES|QL | none (a catalog) |
 | CC Act 1: One cabinet, the contractor's view | one attacked cabinet | Last 24 hours |
 | CC Act 2: The same blip across the whole estate, not on SOC's radar | all 480 cabinets, alerts, inventory | Last 24 hours |
 | CC Act 3a: The history nobody ingested | a year of raw audit read in place (federation) | own one-year range |
@@ -84,14 +85,14 @@ This runs, in order: `setup-aws` (Terraform: bucket with Object Lock and version
 collector and federation read identities; it writes `.env`, `store-keys.json` and `.secrets/`), `verify-infra` (store
 isolation, Object Lock, queue events), `setup-elastic` (templates, pipelines, knowledge-base lookup indices, Fleet policy and
 the AWS S3 integration), `collector-up` (an Elastic Agent container enrolled in Fleet, reading the queue) and `federation`
-(the data source and datasets over `raw/`; there are no files yet, so `make federation-check` comes after the backfill).
+(the data source and datasets over `raw/`; there are no files yet, so `make federation-check` comes after both backfills).
 
 Check: `docker ps` shows `coldchain-collector`; `make verify-infra` ends with all checks passing.
 
 Then the history. This is the long step (tens of thousands of S3 PUTs; restartable, it skips what exists):
 
 ```bash
-make backfill            # raw/ 12 months of audit, 7 days of flows; detect/ 35 days indexed
+make backfill            # raw/ 12 months of audit, 7 days of flows; detect/ 35 days indexed (measured: 56,159 files, 506 MB, about 90 minutes)
 make backfill-epilogue   # scenario B: the TV box (hypothetical)
 ```
 
@@ -99,11 +100,12 @@ Wait until the collector has drained the queue (Kibana > Discover on `metrics-co
 documents; `python -m coldchain.reingest telemetry --dry-run` lists hours that did not arrive), then:
 
 ```bash
-make federation-check    # one query per dataset, with timings
+make federation-check    # one query per dataset, with timings (needs both backfills: the TLS dataset is scenario B)
 make baselines           # what is normal for the Act 2 tiles, measured from the cluster
 make epilogue            # ML jobs and datafeeds over the epilogue window, the new-terms rule (disabled)
-make content             # dashboards, detection rules (disabled), the agent, the scheduled hunt
 make history-frozen      # Act 3b: needs the frozen node; reads raw/ with your AWS profile, about 2 minutes
+make sources             # Act 0 catalog and the "one question, three places" timings (about 5 minutes: counts the raw files in place)
+make content             # dashboards, detection rules (disabled), the agent, the scheduled hunt
 make verify
 ```
 
@@ -120,8 +122,9 @@ make rehearse    # the same, hands-off: setpoints are restored by themselves aft
 make restore     # second terminal: the "go" for containment (otherwise it restores after 30 minutes)
 ```
 
-Before T0, `make demo` writes and indexes a day of normal data (about a minute) so the dashboards start with context, then
-prints `T0=...` (UTC; Kibana shows your browser's time zone). Open Acts 1 and 2 on "Last 24 hours" with auto-refresh.
+Before T0, `make demo` writes and indexes a day of normal data so the dashboards start with context: measured, the first time
+after a day idle that is about 15 minutes (9,300 files, 11 minutes to write, a few to index); a run right after a reset only
+fills the gap since the last one. It then prints `T0=...` and the exact cleanup command (UTC; Kibana shows your browser's time zone). Open Acts 1 and 2 on "Last 24 hours" with auto-refresh.
 
 | After T0 | You should see |
 |---|---|
@@ -134,8 +137,10 @@ The scripted agent question: `make agent-ask`, or paste it from `docs/story-flow
 
 ## 6. Between runs
 
-A run leaves indexed documents, alerts, hunt findings and (when it ends) raw files in the bucket. Use the time you
-**started** the demo, in UTC, not T0:
+A run leaves indexed documents, alerts, hunt findings and (when it ends) raw files in the bucket. The run prints the
+command to use. `SINCE` is the replay's start (T0 minus 3 minutes, UTC): it is after the pre-roll, so the day of context
+stays and the next demo starts quickly. Measured on a rehearsal: it removed 101 audit, 26,880 telemetry, 1,691 summary and
+5,760 probe documents, 6 alerts, the hunt findings and 49 raw file versions, and rebuilt Act 3b, in about 4 minutes:
 
 ```bash
 make reset-demo SINCE=2026-11-16T08:50:00Z                 # dry run for the raw files
@@ -159,7 +164,7 @@ is yours to delete in the console, and the frozen node costs money while it exis
 
 - **AWS session expired** (`LoginRefreshRequired`): run `aws login` or `aws sso login`.
 - **Collector not running:** `make demo` writes to S3 but nothing is indexed. `make collector-up`, `make collector-logs`.
-- **Act 3a empty or slow:** federation reads a year of files, about 40 seconds a query, one federated panel per dashboard.
+- **Act 3a empty or slow:** federation reads a year of files, about 75 seconds a query, one federated panel per dashboard.
   The dashboard sets its own one-year range because Kibana applies the picker to `@timestamp`.
 - **File limit:** a federated dataset lists at most 10,000 files on 9.5.6, so raw audit is one file per store per day. Say
   "default cap" on stage.
