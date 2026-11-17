@@ -21,8 +21,8 @@ Each dashboard starts with a strip that links to the previous act, the next act 
 | CC Act 2: The same blip across the whole estate, not on SOC's radar | all 480 cabinets, alerts, inventory | Last 24 hours |
 | CC Act 3a: The history nobody ingested | a year of raw audit read in place (federation) | own one-year range |
 | CC Act 3b: The history ingested at a predictable price | the same year on the frozen tier | own one-year range |
-| CC Act 4: Edge devices on no one's radar | the TV box, hypothetical (scenario B) | 2026-10-22 to 2026-11-11 |
-| CC Act 5: Hunting agent - the agent that keeps looking | findings of the scheduled hunt | Last 24 hours |
+| CC Act 4: Hunting agent - the agent that keeps looking | findings of the scheduled hunt; it surfaces the TV-box lead | Last 24 hours |
+| CC Act 5: Edge devices on no one's radar | the TV box, hypothetical (scenario B): the evidence behind the lead | 2026-10-22 to 2026-11-11 |
 
 > **Status of this runbook.** The commands below are the ones the author ran, collected in order. A run from an empty AWS
 > account and a new Elastic deployment, following only this file, has **not** been done yet. Expect to fix a step or two,

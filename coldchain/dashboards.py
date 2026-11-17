@@ -68,8 +68,8 @@ ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch
         ("coldchain-act1b-estate", "Act 2", "The whole estate"),
         ("coldchain-act5a-history", "Act 3a", "History read in place"),
         ("coldchain-act5b-history-frozen", "Act 3b", "History on the frozen tier"),
-        ("coldchain-epilogue-edge", "Act 4", "Edge devices"),
-        ("coldchain-hunt-findings", "Act 5", "Hunting agent")]
+        ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
+        ("coldchain-epilogue-edge", "Act 5", "Edge devices")]
 NAV_HEIGHT = 3
 
 
@@ -341,10 +341,11 @@ EVIDENCE = """FROM raw_store_tls
 
 
 def epilogue() -> Dash:
-    d = Dash("coldchain-epilogue-edge", "CC Act 4: Edge devices on no one’s radar",
+    d = Dash("coldchain-epilogue-edge", "CC Act 5: Edge devices on no one’s radar",
              "Scenario B, hypothetical and synthetic: a TV box that downloads 4.6 GB over nine nights.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
-    d.panels.append(md("## Epilogue: the quiet TV box\n**Hypothetical scenario, synthetic data.** Detection runs on the indexed "
+    d.panels.append(md("## Follow the lead: the quiet TV box\n**Hypothetical scenario, synthetic data.** The hunting agent (Act 4) found a TV box "
+                       "talking to a store's system manager, a path no rule watches. This is the evidence. Detection runs on the indexed "
                        "flow summaries and the edge metrics. The evidence table at the bottom reads the raw TLS records "
                        "**in place from S3** (data federation, experimental).", h=4, d=d))
     d.row(4)
@@ -497,14 +498,15 @@ def act5b() -> Dash:
 
 
 def hunt() -> Dash:
-    d = Dash("coldchain-hunt-findings", "CC Act 5: Hunting agent - the agent that keeps looking",
+    d = Dash("coldchain-hunt-findings", "CC Act 4: Hunting agent - the agent that keeps looking",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
     d.panels.append(md("## The hunt: an agent that keeps looking\nNo alert fired for these. Every 30 minutes a workflow asks the SOC agent to sweep the "
                        "estate (live data, a year of raw history read in place, device profiles, exposure) and records what is abnormal, "
                        "with evidence and a proposed action. It proposes, it runs nothing. **AlertZero is not offered on this deployment "
-                       "(9.5.6 Cloud Hosted), so this is the same pattern built from Elastic Workflows and Agent Builder (preview).**",
-                       h=5, d=d))
-    d.row(5)
+                       "(9.5.6 Cloud Hosted), so this is the same pattern built from Elastic Workflows and Agent Builder (preview).**\n\n"
+                       "**A lead worth following:** among the findings, a TV box in store S07 is talking to the system manager. Nothing "
+                       "alerted on that. Next, Act 5 looks at what the TV boxes are doing.", h=7, d=d))
+    d.row(7)
     tiles = (("critical", "Critical findings", RED), ("high", "High findings", AMBER), ("medium", "Medium findings", "#6092C0"))
     for i, (sev, title, color) in enumerate(tiles):
         metric(d, title, f'FROM cc-hunt-findings | WHERE severity == "{sev}" | STATS findings = COUNT(*)', "findings", w=12, x=12 * i)
@@ -546,8 +548,8 @@ def hunt() -> Dash:
 
 # Ids are listed, not read from the builders: `hunt` imports the agent, which imports this module.
 DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
-              "coldchain-act5a-history": act5, "coldchain-act5b-history-frozen": act5b, "coldchain-epilogue-edge": epilogue,
-              "coldchain-hunt-findings": hunt}
+              "coldchain-act5a-history": act5, "coldchain-act5b-history-frozen": act5b, "coldchain-hunt-findings": hunt,
+              "coldchain-epilogue-edge": epilogue}
 
 
 # --- push / check ------------------------------------------------------------------------------------------------
