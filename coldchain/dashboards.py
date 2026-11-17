@@ -53,9 +53,42 @@ class Dash:
         self.y += h
 
     def body(self) -> dict:
+        nav = nav_panel(self.id)
+        panels = self.panels
+        if nav:  # a navigation strip on top: every other panel moves down by its height
+            panels = [nav] + [{**p, "grid": {**p["grid"], "y": p["grid"]["y"] + nav["grid"]["h"]}} for p in self.panels]
         return {"title": self.title, "description": self.description,
                 "time_range": {"from": self.time[0], "to": self.time[1]},
-                "tags": [], "panels": self.panels, "pinned_panels": self.controls}
+                "tags": [], "panels": panels, "pinned_panels": self.controls}
+
+
+# The acts in story order: dashboard id, label, a few words. The navigation strip links to the previous and the next one.
+ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch"),
+        ("coldchain-act1a-cabinet", "Act 1", "One cabinet"),
+        ("coldchain-act1b-estate", "Act 2", "The whole estate"),
+        ("coldchain-act5a-history", "Act 3a", "History read in place"),
+        ("coldchain-act5b-history-frozen", "Act 3b", "History on the frozen tier"),
+        ("coldchain-epilogue-edge", "Act 4", "Edge devices"),
+        ("coldchain-hunt-findings", "Act 5", "Hunting agent")]
+NAV_HEIGHT = 3
+
+
+def _link(i: int) -> str:
+    did, label, words = ACTS[i]
+    return f"[**{label}** {words}](/app/dashboards#/view/{did})"
+
+
+def nav_panel(dash_id: str) -> dict | None:
+    """A strip with links to the previous and next act, and to every act."""
+    ids = [a[0] for a in ACTS]
+    if dash_id not in ids:
+        return None
+    i = ids.index(dash_id)
+    prev = f"\u25C0 {_link(i - 1)}" if i > 0 else "&nbsp;"
+    nxt = f"{_link(i + 1)} \u25B6" if i < len(ACTS) - 1 else "&nbsp;"
+    strip = " \u00B7 ".join(f"**{a[1]}**" if j == i else f"[{a[1]}](/app/dashboards#/view/{a[0]})" for j, a in enumerate(ACTS))
+    return {"type": "markdown", "grid": {"x": 0, "y": 0, "w": 48, "h": NAV_HEIGHT},
+            "config": {"content": f"{prev} &nbsp;&nbsp;|&nbsp;&nbsp; {strip} &nbsp;&nbsp;|&nbsp;&nbsp; {nxt}"}}
 
 
 def esql(q: str) -> dict:
@@ -130,10 +163,10 @@ ALL_TIME = {"from": "now-10y", "to": "now"}  # these panels read a catalog witho
 
 
 def act0() -> Dash:
-    d = Dash("coldchain-act0-sources", "CC Act 0: Every source of truth, one language",
+    d = Dash("coldchain-act0-sources", "CC Act 0: The realms you usually do not watch",
              "Every dataset the demo uses, in five tiers, all read with ES|QL. Counts measured with `make sources`. Synthetic data.",
              time=("now-24h", "now"))
-    d.panels.append(md("## Act 0: every source of truth, one language\n"
+    d.panels.append(md("## Every source of truth, one language\n"
                        "Telemetry, audit, network flows, a year of raw history in S3, the knowledge base, and what the agent finds: "
                        "different shapes, different storage, different cost. **One platform and one language, ES|QL**, reads all of them, "
                        "so you can ask a question nobody modelled in advance. Every tile, chart and table on this page is an ES|QL query "

@@ -470,3 +470,12 @@ at 12:35 UTC was most likely the same bug. The Act 1 header is now the dashboard
 - **Hunt tool corrected (2026-11-16):** `cc_warm_cabinets` listed cabinets recovering from a defrost on 11 to 14 stores (the hunt reported them as medium findings). It now uses rule 2's logic: more than 2 K warm in 3 of the last 10 minutes, relay off, and no relay reading in the last hour. On the live attack it lists S07, S11 and S19 only.
 - **Rehearsal measured (2026-11-16, T0 16:05):** 9 logins at T0-2m20s, 46 setpoint changes at T0+5s (S07's 16 from 10.7.0.41, S11's 16 and S19's 14 from 203.0.113.47); rule 1 alerts for the three stores at T0+99 s; with `make rehearse` (restore at T0+10 min) rule 2 still fired for exactly S07, S11 and S19 at T0+10 min 57 s, no false alerts; the hunt ran in 261 s. `make reset-demo` then removed the run and kept the pre-roll (691,200 telemetry documents = 480 cabinets x 1,440 minutes).
 - **`make verify` fix:** the queue-event check could not peek at the SQS message once the collector ran (it deletes it first); it now accepts the configured `detect/` notification as proof when the message is gone.
+
+## Act 0 renamed (2026-11-17)
+
+- `coldchain-act0-sources` is now titled "CC Act: The realms you usually do not watch" (no number, as asked), and its first heading reads "Every source of truth, one language" because the old "Act 0:" prefix repeated the title. The id did not change. Earlier entries in this file call it "Act 0".
+- Renamed again the same day to "CC Act 0: The realms you usually do not watch" (number restored at the user's request).
+
+## Navigation between the acts (2026-11-17)
+
+- Every dashboard starts with a three-row strip (a markdown panel built by `nav_panel` in `coldchain/dashboards.py`): a link to the previous act, links to all acts with the current one in bold, and a link to the next act. The order is the `ACTS` list (0, 1, 2, 3a, 3b, 4, 5); Act 0 has no previous link and Act 5 no next link. The links are relative (`/app/dashboards#/view/<id>`), so they work on any Kibana host. Every other panel moves down by the strip's height when the dashboard is pushed. Not verified in a browser: how Kibana opens a markdown link (same tab or new tab) and whether the time picker carries over.

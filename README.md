@@ -12,9 +12,11 @@ here is a real retailer, store, person or customer.
 The story is in [docs/story-flow.md](docs/story-flow.md), the design in [CLAUDE.md](CLAUDE.md), the decisions and
 measurements in [docs/decisions.md](docs/decisions.md).
 
+Each dashboard starts with a strip that links to the previous act, the next act and every act.
+
 | Dashboard (Kibana) | Shows | Picker |
 |---|---|---|
-| CC Act 0: Every source of truth, one language | every dataset in five tiers, all read with ES|QL | none (a catalog) |
+| CC Act 0: The realms you usually do not watch | every dataset in five tiers, all read with ES|QL | none (a catalog) |
 | CC Act 1: One cabinet, the contractor's view | one attacked cabinet | Last 24 hours |
 | CC Act 2: The same blip across the whole estate, not on SOC's radar | all 480 cabinets, alerts, inventory | Last 24 hours |
 | CC Act 3a: The history nobody ingested | a year of raw audit read in place (federation) | own one-year range |

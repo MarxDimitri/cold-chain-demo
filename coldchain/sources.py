@@ -4,7 +4,7 @@
     python -m coldchain.sources catalog      # only the catalog
     python -m coldchain.sources moment       # only the timings
 
-`kb-sources` feeds the dashboard "CC Act 0": one row per source with its tier, what it holds, how big it is and how far back it
+`kb-sources` feeds the dashboard "CC Act 0: The realms you usually do not watch": one row per source with its tier, what it holds, how big it is and how far back it
 reaches. The raw files are counted in place by federation, so the rows are measured once (`measured_at`), not live.
 `cc-esql-moment` holds the same question asked of three places with only the FROM changed (live index, frozen tier, raw files in
 S3), with the seconds each took: the "one language" proof of Acts 3a and 3b.
