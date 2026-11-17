@@ -479,3 +479,7 @@ at 12:35 UTC was most likely the same bug. The Act 1 header is now the dashboard
 ## Navigation between the acts (2026-11-17)
 
 - Every dashboard starts with a three-row strip (a markdown panel built by `nav_panel` in `coldchain/dashboards.py`): a link to the previous act, links to all acts with the current one in bold, and a link to the next act. The order is the `ACTS` list (0, 1, 2, 3a, 3b, 4, 5); Act 0 has no previous link and Act 5 no next link. The links are relative (`/app/dashboards#/view/<id>`), so they work on any Kibana host. Every other panel moves down by the strip's height when the dashboard is pushed. Not verified in a browser: how Kibana opens a markdown link (same tab or new tab) and whether the time picker carries over.
+
+## Streetlight visual on Act 0 (2026-11-17)
+
+- A row on "CC Act 0" illustrates the streetlight effect (we search where the light is): an ASCII streetlight (markdown) next to a weekly bar chart of the store audit from the frozen index, in two layers: events older than 35 days, dark grey, "in the dark: only in raw files and on the frozen tier", and the last 35 days, amber, "under the streetlight: the live index". The 35 days are the indexed retention; the boundary slides with `NOW()`. Not verified in a browser: how Kibana renders the code block art and whether the per-layer static colours are honoured (the API accepts them). A real illustration would need an image panel with a hosted image: not done.

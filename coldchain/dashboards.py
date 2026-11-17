@@ -176,6 +176,35 @@ def act0() -> Dash:
                        "FROM raw_store_audit              // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
                        "FROM kb-assets | ...              // the knowledge base: context joined to any of them\n```", h=9, d=d))
     d.row(9)
+    # The streetlight effect: we look for the keys where the light is. The light is the live index (35 days); the dark is
+    # the year of history that only exists in raw files and on the frozen tier.
+    d.panels.append(md("### The streetlight effect\nWe search where the light is.\n```\n"
+                       "       .-\"\"-.\n"
+                       "      /  **  \\     UNDER THE LIGHT\n"
+                       "      '-.__.-'     the live index\n"
+                       "       / || \\      35 days\n"
+                       "      /  ||  \\\n"
+                       "     / . || . \\\n"
+                       "    /  . || .  \\\n"
+                       "       ||\n"
+                       "       ||          IN THE DARK\n"
+                       "       ||          a year of raw files,\n"
+                       "       ||          the frozen tier,\n"
+                       "   ____||____      the knowledge base\n```", w=16, h=13, d=d))
+    lit = ('FROM cc-history-audit | WHERE @timestamp >= NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
+           '| SORT week')
+    dark = ('FROM cc-history-audit | WHERE @timestamp < NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
+            '| SORT week')
+    layers = [{"type": "bar", "data_source": esql(q), "x": {"column": "week"},
+               "y": [{"column": "events", "label": label, "color": {"type": "static", "color": color}}]}
+              for q, label, color in ((dark, "In the dark: only in raw files and on the frozen tier", "#343741"),
+                                      (lit, "Under the streetlight: the live index, 35 days", "#F5A700"))]
+    d.add("Store audit events per week: what the light covers, and what it does not",
+          {"type": "xy", "layers": layers, "time_range": ALL_TIME,
+           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "audit events", "visible": True}}},
+           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}, 32, 13, x=16, query=dark)
+    d.queries.append(("streetlight (lit layer)", lit, {}))
+    d.row(13)
     for i, tier in enumerate(TIER_COLORS):
         q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
         d.add(tier, {"type": "metric", "data_source": esql(q), "time_range": ALL_TIME, "metrics": [
