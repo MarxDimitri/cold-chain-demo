@@ -88,7 +88,8 @@ def nav_panel(dash_id: str) -> dict | None:
     nxt = f"{_link(i + 1)} \u25B6" if i < len(ACTS) - 1 else "&nbsp;"
     strip = " \u00B7 ".join(f"**{a[1]}**" if j == i else f"[{a[1]}](/app/dashboards#/view/{a[0]})" for j, a in enumerate(ACTS))
     return {"type": "markdown", "grid": {"x": 0, "y": 0, "w": 48, "h": NAV_HEIGHT},
-            "config": {"content": f"{prev} &nbsp;&nbsp;|&nbsp;&nbsp; {strip} &nbsp;&nbsp;|&nbsp;&nbsp; {nxt}"}}
+            "config": {"content": f"{prev} &nbsp;&nbsp;|&nbsp;&nbsp; {strip} &nbsp;&nbsp;|&nbsp;&nbsp; {nxt}",
+                       "settings": {"open_links_in_new_tab": True}}}
 
 
 def esql(q: str) -> dict:
@@ -165,32 +166,9 @@ ALL_TIME = {"from": "now-10y", "to": "now"}  # these panels read a catalog witho
 def act0() -> Dash:
     d = Dash("coldchain-act0-sources", "CC Act 0: The realms you usually do not watch",
              "Every dataset the demo uses, in five tiers, all read with ES|QL. Counts measured with `make sources`. Synthetic data.",
-             time=("now-24h", "now"))
-    d.panels.append(md("## Every source of truth, one language\n"
-                       "Telemetry, audit, network flows, a year of raw history in S3, the knowledge base, and what the agent finds: "
-                       "different shapes, different storage, different cost. **One platform and one language, ES|QL**, reads all of them, "
-                       "so you can ask a question nobody modelled in advance. Every tile, chart and table on this page is an ES|QL query "
-                       "(raw files are counted once with `make sources`).\n\n"
-                       "```\nFROM logs-coldchain.audit-default   // live index: 35 days, milliseconds\n"
-                       "FROM cc-history-audit             // frozen tier: 12 months, about a second\n"
-                       "FROM raw_store_audit              // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
-                       "FROM kb-assets | ...              // the knowledge base: context joined to any of them\n```", h=9, d=d))
-    d.row(9)
-    # The streetlight effect: we look for the keys where the light is. The light is the live index (35 days); the dark is
-    # the year of history that only exists in raw files and on the frozen tier.
-    d.panels.append(md("### The streetlight effect\nWe search where the light is.\n```\n"
-                       "       .-\"\"-.\n"
-                       "      /  **  \\     UNDER THE LIGHT\n"
-                       "      '-.__.-'     the live index\n"
-                       "       / || \\      35 days\n"
-                       "      /  ||  \\\n"
-                       "     / . || . \\\n"
-                       "    /  . || .  \\\n"
-                       "       ||\n"
-                       "       ||          IN THE DARK\n"
-                       "       ||          a year of raw files,\n"
-                       "       ||          the frozen tier,\n"
-                       "   ____||____      the knowledge base\n```", w=16, h=13, d=d))
+             time=("now-1y", "now"))
+    # The streetlight effect, as a chart: we search where the light is (the live index, 35 days); the dark is the year of
+    # history that only exists in raw files and on the frozen tier. It sits on top, under the navigation strip.
     lit = ('FROM cc-history-audit | WHERE @timestamp >= NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
            '| SORT week')
     dark = ('FROM cc-history-audit | WHERE @timestamp < NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
@@ -200,11 +178,21 @@ def act0() -> Dash:
               for q, label, color in ((dark, "In the dark: only in raw files and on the frozen tier", "#343741"),
                                       (lit, "Under the streetlight: the live index, 35 days", "#F5A700"))]
     d.add("Store audit events per week: what the light covers, and what it does not",
-          {"type": "xy", "layers": layers, "time_range": ALL_TIME,
+          {"type": "xy", "layers": layers, "time_range": {"from": "now-1y", "to": "now"},
            "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "audit events", "visible": True}}},
-           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}, 32, 13, x=16, query=dark)
+           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}, 48, 10, query=dark)
     d.queries.append(("streetlight (lit layer)", lit, {}))
-    d.row(13)
+    d.row(10)
+    d.panels.append(md("## Every source of truth, one platform, one language\n"
+                       "Telemetry, audit, network flows, a year of raw history in S3, the knowledge base, and what the agent finds: "
+                       "different shapes, different storage, different cost. **One platform and one language, ES|QL**, reads all of them, "
+                       "so you can ask a question nobody modelled in advance. Every tile, chart and table on this page is an ES|QL query "
+                       "(raw files are counted once with `make sources`).\n\n"
+                       "```\nFROM logs-coldchain.audit-default     // live index: 35 days, milliseconds\n"
+                       "FROM cc-history-audit               // frozen tier: 12 months, about a second\n"
+                       "FROM raw_store_audit                // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
+                       "FROM kb-assets | ...                // the knowledge base: context joined to any of them\n```", h=9, d=d))
+    d.row(9)
     for i, tier in enumerate(TIER_COLORS):
         q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
         d.add(tier, {"type": "metric", "data_source": esql(q), "time_range": ALL_TIME, "metrics": [

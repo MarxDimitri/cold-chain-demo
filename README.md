@@ -12,7 +12,7 @@ here is a real retailer, store, person or customer.
 The story is in [docs/story-flow.md](docs/story-flow.md), the design in [CLAUDE.md](CLAUDE.md), the decisions and
 measurements in [docs/decisions.md](docs/decisions.md).
 
-Each dashboard starts with a strip that links to the previous act, the next act and every act.
+Each dashboard starts with a strip that links to the previous act, the next act and every act. The dashboards are code: `make dashboards` overwrites edits made in the Kibana UI, so ask for an edit to be mirrored into `coldchain/dashboards.py` if it should stay.
 
 | Dashboard (Kibana) | Shows | Picker |
 |---|---|---|
