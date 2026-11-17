@@ -193,6 +193,20 @@ def act0() -> Dash:
                        "FROM raw_store_audit                // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
                        "FROM kb-assets | ...                // the knowledge base: context joined to any of them\n```", h=9, d=d))
     d.row(9)
+    from .sources import CORRELATION  # one statement over the live index, the raw files and the knowledge base
+    d.panels.append(md("### One statement, three sources\nCorrelate across different sources in one ES|QL statement: the live index and the raw "
+                       "files in S3 (two subqueries), joined to the knowledge base. Which stores did the attacker's address visit, when "
+                       "first, where is that on record, and whose contractor account runs each store? The result below was measured when "
+                       "`make sources` last ran (about 75 s: the raw files are read in place); run `make correlation` after the attack to "
+                       "see today's visits next to the history.\n\n```\n" + CORRELATION + "\n```", h=14, d=d))
+    d.row(14)
+    q = ("FROM cc-esql-correlation | SORT first_seen | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen), "
+         "measured = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", measured_at) | KEEP store, contractor, visits, first_seen, seen_in, seconds, measured")
+    cols = [("store", 80), ("contractor", 110), ("visits", 80), ("first_seen", 160), ("seen_in", 330), ("seconds", 90), ("measured", 160)]
+    d.add("Attacker address: visits per store, where it is on record, and the contractor account", {
+        "type": "data_table", "time_range": ALL_TIME, "data_source": esql(q), "metrics": [{"column": c, "width": w} for c, w in cols]},
+        48, 9, query=q)
+    d.row(9)
     for i, tier in enumerate(TIER_COLORS):
         q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
         d.add(tier, {"type": "metric", "data_source": esql(q), "time_range": ALL_TIME, "metrics": [

@@ -134,7 +134,7 @@ hunt-run:
 # ======================================================================================================================
 # Runbook targets: see README.md for the order, the prerequisites and what each step needs.
 # ======================================================================================================================
-.PHONY: help setup backfill backfill-epilogue federation federation-check epilogue baselines sources content verify teardown teardown-elastic \
+.PHONY: help setup backfill backfill-epilogue federation federation-check epilogue baselines sources correlation content verify teardown teardown-elastic \
         clean-raw hunt-clear reset-demo
 
 help:
@@ -179,6 +179,11 @@ baselines:
 sources:
 	$(PY) -m coldchain.sources
 
+# The cross-source correlation example of Act 0 (live index + raw files + knowledge base in one statement, about 75 s). Re-run it
+# after the attack to see today's visits next to the history. `make sources` includes it.
+correlation:
+	$(PY) -m coldchain.sources correlation
+
 # Scenario B: ML jobs and datafeeds over the epilogue window, and the new-terms rule (created disabled).
 epilogue:
 	$(PY) -m coldchain.epilogue setup
@@ -204,13 +209,14 @@ hunt-clear:
 
 # Everything a run leaves behind: indexed data, alerts, hunt findings, and (listed, deleted with DELETE=1) the raw files.
 # SINCE is the replay's start (T0 minus 3 minutes; the run prints it): after the pre-roll, so the day of context stays.
-# With DELETE=1 the frozen copy of the history is rebuilt afterwards.
+# With DELETE=1 the frozen copy of the history is rebuilt afterwards and the Act 0 correlation is measured again (history only).
 reset-demo:
 	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"; exit 1)
 	$(MAKE) clean-run SINCE=$(SINCE)
 	$(MAKE) hunt-clear
 	$(MAKE) clean-raw SINCE=$(SINCE) $(if $(DELETE),DELETE=1)
 	$(if $(DELETE),$(MAKE) history-frozen)
+	$(if $(DELETE),$(MAKE) correlation)
 
 # Removes what the repo created: the hunt, the frozen copy, the collector and the AWS stack (bucket versions included).
 # The Elastic Cloud deployment is not touched: delete it in the Elastic Cloud console.

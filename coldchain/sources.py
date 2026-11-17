@@ -3,6 +3,7 @@
     python -m coldchain.sources              # measure everything, load kb-sources and cc-esql-moment (about 5 minutes)
     python -m coldchain.sources catalog      # only the catalog
     python -m coldchain.sources moment       # only the timings
+    python -m coldchain.sources correlation  # only the cross-source correlation (about 75 s)
 
 `kb-sources` feeds the dashboard "CC Act 0: The realms you usually do not watch": one row per source with its tier, what it holds, how big it is and how far back it
 reaches. The raw files are counted in place by federation, so the rows are measured once (`measured_at`), not live.
@@ -53,6 +54,18 @@ SOURCES: list[tuple[str, str, str, bool]] = [
 # The Act 3 question, word for word the same for every place: only the FROM changes.
 QUESTION = ('FROM {src} | WHERE event.action == "logged-in" AND CIDR_MATCH(TO_IP(source.ip), "203.0.113.0/24") '
             "| STATS first_seen = MIN(@timestamp), logins = COUNT(*) BY store = retail.store.id | SORT first_seen | LIMIT 20")
+# One statement over three kinds of source: the live index and the raw files in S3 (as two subqueries, each turning the IP into
+# text and dropping the typed column, because the index types it as ip and the dataset as text), and the knowledge base
+# (LOOKUP JOIN). Which stores did the attacker's address visit, when first, where is that on record, whose contractor account?
+CORRELATION = """FROM (FROM logs-coldchain.audit-default | EVAL ip = TO_STRING(source.ip), origin = "live index" | DROP source.ip),
+     (FROM raw_store_audit | EVAL ip = TO_STRING(source.ip), origin = "raw files in S3" | DROP source.ip)
+| WHERE event.action == "logged-in" AND CIDR_MATCH(TO_IP(ip), "203.0.113.0/24")
+| LOOKUP JOIN kb-assets ON device.id
+| STATS visits = COUNT(*), first_seen = MIN(@timestamp), seen_in = VALUES(origin)
+    BY store = retail.store.id, contractor = contractor.account.id
+| SORT first_seen
+| LIMIT 20"""
+
 PLACES = [("Live index", INDEXED, "logs-coldchain.audit-default"), ("Frozen tier", FROZEN, "cc-history-audit"),
           ("Raw files in S3", RAW, "raw_store_audit")]
 
@@ -96,6 +109,20 @@ def moment(fed: Es) -> list[dict]:
     return rows
 
 
+def correlation(fed: Es) -> list[dict]:
+    now = datetime.now(timezone.utc).isoformat()
+    res, secs = fed.esql(CORRELATION)
+    cols = [c["name"] for c in res["columns"]]
+    rows = []
+    for v in res["values"]:
+        r = dict(zip(cols, v))
+        seen = r["seen_in"] if isinstance(r["seen_in"], list) else [r["seen_in"]]
+        rows.append({"store": r["store"], "contractor": r["contractor"], "visits": r["visits"], "first_seen": r["first_seen"],
+                     "seen_in": " + ".join(sorted(seen)), "seconds": round(secs, 1), "measured_at": now})
+    print(f"  {len(rows)} stores in {secs:.1f} s")
+    return rows
+
+
 def load(es, index: str, rows: list[dict], lookup: bool) -> None:
     if es.indices.exists(index=index):
         es.indices.delete(index=index)
@@ -104,6 +131,9 @@ def load(es, index: str, rows: list[dict], lookup: bool) -> None:
     if index == "kb-sources":
         props |= {"source": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword, "ask_with": keyword,
                   "rows": {"type": "long"}, "first_seen": {"type": "date"}, "last_seen": {"type": "date"}, "days": {"type": "integer"}}
+    elif index == "cc-esql-correlation":
+        props |= {"store": keyword, "contractor": keyword, "visits": {"type": "integer"}, "first_seen": {"type": "date"},
+                  "seen_in": keyword, "seconds": {"type": "float"}}
     else:
         props |= {"order": {"type": "integer"}, "place": keyword, "tier": keyword, "ask_with": keyword, "seconds": {"type": "float"},
                   "stores_found": {"type": "integer"}, "answer": keyword}
@@ -114,7 +144,7 @@ def load(es, index: str, rows: list[dict], lookup: bool) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("what", nargs="?", choices=["all", "catalog", "moment"], default="all")
+    ap.add_argument("what", nargs="?", choices=["all", "catalog", "moment", "correlation"], default="all")
     what = ap.parse_args(argv).what
     es, fed = client(), Es()
     if what in ("all", "catalog"):
@@ -123,6 +153,9 @@ def main(argv: list[str] | None = None) -> None:
     if what in ("all", "moment"):
         print("the same question, three places:")
         load(es, "cc-esql-moment", moment(fed), lookup=False)
+    if what in ("all", "correlation"):
+        print("one statement, three sources:")
+        load(es, "cc-esql-correlation", correlation(fed), lookup=False)
 
 
 if __name__ == "__main__":

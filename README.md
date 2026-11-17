@@ -106,7 +106,8 @@ make federation-check    # one query per dataset, with timings (needs both backf
 make baselines           # what is normal for the Act 2 tiles, measured from the cluster
 make epilogue            # ML jobs and datafeeds over the epilogue window, the new-terms rule (disabled)
 make history-frozen      # Act 3b: needs the frozen node; reads raw/ with your AWS profile, about 2 minutes
-make sources             # Act 0 catalog and the "one question, three places" timings (about 5 minutes: counts the raw files in place)
+make sources             # Act 0 catalog, the "one question, three places" timings and the cross-source correlation (about 6 minutes: counts the raw files in place)
+make correlation         # only the cross-source correlation (about 80 s); run it again after the attack to see today's visits
 make content             # dashboards, detection rules (disabled), the agent, the scheduled hunt
 make verify
 ```
