@@ -121,8 +121,10 @@ def status(es) -> None:
 
 
 def records(es, job: str, min_score: float = 75) -> list[dict]:
-    res = es.ml.get_records(job_id=job, record_score=min_score, sort="timestamp", desc=False, page={"size": 1000})
-    return res["records"]
+    """Anomaly records of a job. On Serverless the get-records API is not available: read the results index instead."""
+    res = es.search(index=".ml-anomalies-*", size=1000, sort=[{"timestamp": "asc"}], query={"bool": {"filter": [
+        {"term": {"job_id": job}}, {"term": {"result_type": "record"}}, {"range": {"record_score": {"gte": min_score}}}]}})
+    return [h["_source"] for h in res["hits"]["hits"]]
 
 
 def score(es) -> dict:

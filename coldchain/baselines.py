@@ -44,7 +44,7 @@ def measure(es) -> list[dict]:
             f"measured: mean of {days} days of indexed audit (range {low} to {high} a day), contractor changes only", "Parameter changes"),
         row("cabinets-reporting", "level", cabs, "cabinets", "kb-assets: 20 stores x 24 cabinets", "Cabinets reporting"),
         row("cabinets-warm", "level", 0, "cabinets",
-            "measured: 0 false alarms of the warm-without-defrost logic over 34 days (docs/decisions.md)", "Cabinets warm, no defrost"),
+            "measured: 0 false alarms of the warm-without-defrost logic over the 7 days of indexed telemetry (a measurement of the full version over 34 days: docs/decisions.md)", "Cabinets warm, no defrost"),
         row("open-alerts", "level", 0, "alerts", "design: no alerts in normal operation", "Open alerts"),
     ]
 
