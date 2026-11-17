@@ -181,11 +181,40 @@ def act0() -> Dash:
 CONTRACTOR_CABINET = "S07-C05"  # one of the 46 attacked cabinets: what the contractor's portal shows
 
 
+STORE_QUERY = """FROM (FROM metrics-coldchain.case-default
+        | WHERE retail.store.id == "S07" AND @timestamp >= ?_tstart AND @timestamp < ?_tend
+        | STATS setpoint = MAX(coldchain.case.setpoint), readings = COUNT(*) BY cab = device.id
+        | EVAL kind = "cabinet"),
+     (FROM logs-coldchain.audit-default
+        | WHERE retail.store.id == "S07" AND @timestamp >= ?_tstart AND @timestamp < ?_tend
+        | STATS events = COUNT(*), changes = COUNT(*) WHERE event.action == "parameter-change",
+                logins = COUNT(*) WHERE event.action == "logged-in" AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24")
+                AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")
+        | EVAL kind = "audit"),
+     (FROM logs-netflow.summary-default
+        | WHERE retail.store.id == "S07" AND @timestamp >= ?_tstart AND @timestamp < ?_tend
+        | STATS flows = COUNT(*), mb = ROUND(SUM(network.bytes) / 1000000.0, 1) BY role = retail.device.role
+        | EVAL kind = "flows"),
+     (FROM kb-assets
+        | WHERE retail.store.id == "S07" AND device.id == "S07-SM800"
+        | EVAL kind = "asset", internet = coldchain.exposure.internet, firmware = coldchain.controller.firmware,
+               contractor = contractor.account.id
+        | KEEP kind, internet, firmware, contractor),
+     (FROM kb-assets
+        | WHERE retail.store.id == "S07"
+        | STATS devices = COUNT(*)
+        | EVAL kind = "assets")
+| SORT kind, cab
+| LIMIT 100"""
+
+
 def act1a() -> Dash:
     """What one contractor sees: a single cabinet, no estate, no alerts. Same indexed data as 1b, filtered to one device."""
     cab = f'device.id == "{CONTRACTOR_CABINET}"'
     d = Dash("coldchain-act1a-cabinet", "CC Act 1: One cabinet, the contractor's view",
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
+    custom(d, "Store 07, Colmar, from above: what each system says", STORE_QUERY, panels.STORE_LAYOUT, w=48, h=32)
+    d.row(32)
     tile = lambda title, q, col, x: metric(d, title, q, col, w=16, x=x)
     tile("Setpoint now (°C)", f"FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() "
          "| SORT @timestamp DESC | LIMIT 1 | EVAL setpoint = ROUND(coldchain.case.setpoint, 1) | KEEP setpoint", "setpoint", 0)

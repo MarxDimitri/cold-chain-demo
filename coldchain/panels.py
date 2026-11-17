@@ -141,3 +141,127 @@ POS_EVIDENCE = BASE_CSS + """
 {% endfor %}
 </div>
 """
+
+# Act 1: the store from above, with the aggregates of every system rendered where that system sits in the store.
+# Query: one union of four kinds of rows (cabinet, audit, flows, asset, assets); see STORE_QUERY in dashboards.py.
+STORE_LAYOUT = BASE_CSS + """
+<style>
+.cc-store-wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.cc-store-svg{flex:1 1 760px;min-width:520px}
+.cc-legend{flex:0 0 250px}
+.cc-legend .item{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px 0}
+.cc-legend .sw{flex:0 0 18px;height:18px;border-radius:3px;margin-top:2px}
+</style>
+{% assign changes = 0 %}{% assign logins = 0 %}{% assign events = 0 %}{% assign readings = 0 %}{% assign attacked = 0 %}
+{% assign f_sm = 0 %}{% assign f_srv = 0 %}{% assign f_lane = 0 %}{% assign f_bo = 0 %}{% assign f_total = 0 %}
+{% assign mb_srv = 0 %}{% assign mb_lane = 0 %}{% assign mb_bo = 0 %}{% assign mb_total = 0 %}
+{% assign internet = false %}{% assign firmware = "" %}{% assign contractor = "" %}{% assign devices = 0 %}
+{% for row in rows %}
+  {% if row["kind"].value == "audit" %}
+    {% assign changes = row["changes"].value %}{% assign logins = row["logins"].value %}{% assign events = row["events"].value %}
+  {% elsif row["kind"].value == "flows" %}
+    {% assign f_total = f_total | plus: row["flows"].value %}{% assign mb_total = mb_total | plus: row["mb"].value %}
+    {% if row["role"].value == "system-manager" %}{% assign f_sm = row["flows"].value %}{% endif %}
+    {% if row["role"].value == "store-server" %}{% assign f_srv = row["flows"].value %}{% assign mb_srv = row["mb"].value %}{% endif %}
+    {% if row["role"].value == "pos-lane" %}{% assign f_lane = row["flows"].value %}{% assign mb_lane = row["mb"].value %}{% endif %}
+    {% if row["role"].value == "pos-backoffice" %}{% assign f_bo = row["flows"].value %}{% assign mb_bo = row["mb"].value %}{% endif %}
+  {% elsif row["kind"].value == "asset" %}
+    {% assign internet = row["internet"].value %}{% assign firmware = row["firmware"].value %}{% assign contractor = row["contractor"].value %}
+  {% elsif row["kind"].value == "assets" %}
+    {% assign devices = row["devices"].value %}
+  {% elsif row["kind"].value == "cabinet" %}
+    {% assign readings = readings | plus: row["readings"].value %}
+    {% if row["setpoint"].value > 5 %}{% assign attacked = attacked | plus: 1 %}{% endif %}
+  {% endif %}
+{% endfor %}
+<div class="cc"><div class="cc-store-wrap">
+<div class="cc-store-svg">
+<svg viewBox="0 0 1250 640" width="100%" role="img" aria-label="Store 07 from above">
+  <rect x="10" y="40" width="1090" height="590" rx="6" fill="none" stroke="currentColor" stroke-width="3"/>
+  <text x="14" y="26" font-size="18" font-weight="700" fill="currentColor">Store 07, Colmar</text>
+  <text x="150" y="26" font-size="12" fill="currentColor" opacity=".7">every box that holds data, and what it says</text>
+
+  <text x="30" y="72" font-size="12" fill="#00857c" font-weight="700">FREEZER AND CHILLER CABINETS C01 to C24 (case controllers)</text>
+  {% assign ci = 0 %}
+  {% for row in rows %}{% if row["kind"].value == "cabinet" %}
+    {% assign col = ci | modulo: 12 %}{% assign line = ci | divided_by: 12 | floor %}
+    {% assign x = col | times: 50 | plus: 30 %}{% assign y = line | times: 52 | plus: 84 %}
+    {% if row["setpoint"].value > 5 %}{% assign fill = "#BD271E" %}{% assign stroke = "#7a1b15" %}{% assign ink = "#ffffff" %}
+    {% elsif ci > 15 %}{% assign fill = "#D7E8F7" %}{% assign stroke = "#6092C0" %}{% assign ink = "#1a1c21" %}
+    {% else %}{% assign fill = "#CDEFEA" %}{% assign stroke = "#00BFB3" %}{% assign ink = "#1a1c21" %}{% endif %}
+    <rect x="{{ x }}" y="{{ y }}" width="44" height="44" rx="4" fill="{{ fill }}" stroke="{{ stroke }}" stroke-width="{% if row["cab"].value == "S07-C05" %}5{% else %}2{% endif %}">
+      <title>{{ row["cab"].value }}: setpoint {{ row["setpoint"].value }} C, {{ row["readings"].value }} readings</title></rect>
+    <text x="{{ x | plus: 22 }}" y="{{ y | plus: 27 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text>
+    {% assign ci = ci | plus: 1 %}
+  {% endif %}{% endfor %}
+  <text x="30" y="204" font-size="12" fill="currentColor">C05 (heavy outline): the one cabinet the contractor sees.</text>
+  <text x="30" y="224" font-size="13" font-weight="700" fill="{% if attacked > 0 %}#BD271E{% else %}#00857c{% endif %}">{{ readings }} readings in the window{% if attacked > 0 %}, {{ attacked }} cabinets at +50 C{% endif %}</text>
+
+  <rect x="660" y="56" width="200" height="200" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+  <text x="760" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Plant room</text>
+  <rect x="672" y="86" width="176" height="28" rx="6" fill="#343741"/>
+  <text x="760" y="105" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Compressor rack</text>
+  <rect x="672" y="124" width="176" height="124" rx="6" fill="{% if changes > 0 %}#BD271E{% else %}#00A79D{% endif %}"/>
+  <text x="760" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">AK-SM 800A system manager</text>
+  <text x="760" y="166" text-anchor="middle" font-size="12" fill="#fff">{{ events }} audit events</text>
+  <text x="760" y="184" text-anchor="middle" font-size="12" fill="#fff">{{ changes }} parameter changes</text>
+  <text x="760" y="202" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">{{ logins }} outside logins</text>
+  <text x="760" y="222" text-anchor="middle" font-size="12" fill="#fff">firmware {{ firmware }} · {{ f_sm }} flows</text>
+  <text x="760" y="240" text-anchor="middle" font-size="11" fill="#fff" opacity=".9">default account, {% if internet == true %}internet-facing{% else %}not exposed{% endif %}</text>
+  <line x1="600" y1="150" x2="660" y2="150" stroke="#00BFB3" stroke-width="3" stroke-dasharray="8 6"/>
+
+  <rect x="880" y="56" width="200" height="200" rx="6" fill="#CDEFEA" stroke="#00BFB3" stroke-width="2"/>
+  <text x="980" y="160" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1c21">Cold room</text>
+
+  {% if internet == true %}
+  <path d="M1115 100 a24 24 0 0 1 8 -46 a34 34 0 0 1 64 8 a24 24 0 0 1 10 38 z" fill="#E7664C"/>
+  <text x="1170" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">contractor</text>
+  <text x="1170" y="98" text-anchor="middle" font-size="11" fill="#fff">{{ contractor }}</text>
+  <path d="M1170 110 L1170 160 L850 160" fill="none" stroke="#BD271E" stroke-width="3" stroke-dasharray="9 7"/>
+  <text x="1110" y="180" text-anchor="middle" font-size="11" fill="#BD271E">logins from the internet</text>
+  <text x="1110" y="194" text-anchor="middle" font-size="11" fill="#BD271E">reach the manager directly</text>
+  {% endif %}
+
+  <text x="30" y="300" font-size="12" font-weight="700" fill="currentColor" opacity=".6">SALES FLOOR</text>
+  <rect x="40" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/><rect x="150" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
+  <rect x="260" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/><rect x="370" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
+  <rect x="480" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
+
+  <text x="30" y="520" font-size="12" font-weight="700" fill="currentColor">CHECKOUT LANES</text>
+  <rect x="30" y="530" width="78" height="40" rx="5" fill="#8C97A8"/><rect x="118" y="530" width="78" height="40" rx="5" fill="#8C97A8"/>
+  <rect x="206" y="530" width="78" height="40" rx="5" fill="#8C97A8"/><rect x="294" y="530" width="78" height="40" rx="5" fill="#8C97A8"/>
+  <text x="69" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 1</text><text x="157" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 2</text>
+  <text x="245" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 3</text><text x="333" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 4</text>
+  <text x="30" y="592" font-size="12" fill="currentColor">{{ f_lane }} flows · {{ mb_lane }} MB to the store server and the payment gateway</text>
+  <text x="400" y="624" font-size="11" fill="currentColor" opacity=".7">entrance</text><rect x="390" y="628" width="90" height="4" fill="currentColor" opacity=".4"/>
+
+  <rect x="660" y="290" width="410" height="300" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+  <text x="865" y="312" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Back office · network cabinet</text>
+  <rect x="676" y="326" width="378" height="56" rx="6" fill="#1a1c21"/>
+  <text x="865" y="350" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">SD-WAN router / firewall</text>
+  <text x="865" y="370" text-anchor="middle" font-size="12" fill="#fff">{{ f_total }} flows · {{ mb_total | round: 1 }} MB seen in the window</text>
+  <rect x="676" y="394" width="184" height="64" rx="6" fill="#8C97A8"/>
+  <text x="768" y="418" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Store server</text>
+  <text x="768" y="438" text-anchor="middle" font-size="12" fill="#fff">{{ f_srv }} flows · {{ mb_srv }} MB</text>
+  <rect x="870" y="394" width="184" height="64" rx="6" fill="#8C97A8"/>
+  <text x="962" y="418" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Back-office POS</text>
+  <text x="962" y="438" text-anchor="middle" font-size="12" fill="#fff">{{ f_bo }} flows · {{ mb_bo }} MB</text>
+  <text x="865" y="486" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">run by central IT: {{ devices }} devices in the inventory</text>
+  <text x="865" y="508" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">one flat store network: nothing separates these</text>
+  <text x="865" y="526" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">boxes from the refrigeration controller</text>
+
+  <g fill="#69707D"><rect x="570" y="300" width="26" height="16" rx="3"/><polygon points="596,304 608,298 608,318 596,312"/>
+  <rect x="570" y="470" width="26" height="16" rx="3"/><polygon points="596,474 608,468 608,488 596,482"/>
+  <rect x="20" y="468" width="0" height="0"/></g>
+  <text x="560" y="336" font-size="11" fill="currentColor" opacity=".7">3 cameras</text>
+</svg>
+</div>
+<div class="cc-legend">
+  <div class="muted" style="font-weight:700;letter-spacing:.04em;margin-bottom:10px">WHAT WE COLLECT FOR THIS STORE</div>
+  <div class="item"><div class="sw" style="background:#00BFB3"></div><div><b>Cabinet telemetry</b><div class="muted">{{ readings }} readings: temperature, setpoint, defrost</div></div></div>
+  <div class="item"><div class="sw" style="background:#E7664C"></div><div><b>System manager audit</b><div class="muted">{{ events }} events: logins, commands, firmware</div></div></div>
+  <div class="item"><div class="sw" style="background:#1a1c21"></div><div><b>Network flows</b><div class="muted">{{ f_total }} flows summarised per device pair</div></div></div>
+  <div class="item"><div class="sw" style="background:#8C97A8"></div><div><b>Asset inventory</b><div class="muted">{{ devices }} devices, owner, contractor, exposure</div></div></div>
+</div>
+</div></div>
+"""
