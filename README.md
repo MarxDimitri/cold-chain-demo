@@ -1,192 +1,133 @@
-# Cold-chain demo: edge, data federation and an agent that keeps hunting
+# Cold-chain demo: one platform, one language, an agent that keeps looking (15 minutes)
 
 A reproducible Elastic demo with **synthetic data**: a fictional retail chain (20 stores on the Upper Rhine, 480 refrigeration
-cabinets) is attacked, and a security team finds out how, how long ago, and who is next. Everything is invented. Nothing
-here is a real retailer, store, person or customer.
+cabinets) is attacked, and a security team finds out how, how long ago, and what is next. Everything is invented. Nothing here is a
+real retailer, store, person or customer.
+
+This is the **simplified** version (branch `simplified-serverless`): Elastic Cloud **Serverless**, no data federation, one indexed
+history, **POS systems** instead of the TV boxes, six short dashboards built with **custom panels**, 15 minutes. The full
+version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is preserved as the git tag `v1-ech-federation-tv`.
 
 - Stores only **write to an S3 bucket**. Nothing runs in a store.
-- The central SOC **detects** on a small indexed stream (rules, ML) and **hunts** with ES|QL data federation over the bulky
-  raw files, read in place (experimental).
-- An **agent** (Agent Builder plus an Elastic Workflow) keeps looking without being asked.
+- A collector reads the bucket's queue and indexes everything into the Serverless project.
+- Rules detect, an **agent** (Agent Builder plus an Elastic Workflow) keeps looking without being asked, and ES|QL is the one
+  language over every source.
 
-The story is in [docs/story-flow.md](docs/story-flow.md), the design in [CLAUDE.md](CLAUDE.md), the decisions and
-measurements in [docs/decisions.md](docs/decisions.md).
+## The story in 15 minutes
 
-Each dashboard starts with a strip that links to the previous act, the next act and every act. The dashboards are code: `make dashboards` overwrites edits made in the Kibana UI, so ask for an edit to be mirrored into `coldchain/dashboards.py` if it should stay.
-
-| Dashboard (Kibana) | Shows | Picker |
+| Time | Dashboard (Kibana) | What the audience sees |
 |---|---|---|
-| CC Act 0: The realms you usually do not watch | every dataset in five tiers, all read with ES|QL | none (a catalog) |
-| CC Act 1: One cabinet, the contractor's view | one attacked cabinet | Last 24 hours |
-| CC Act 2: The same blip across the whole estate, not on SOC's radar | all 480 cabinets, alerts, inventory | Last 24 hours |
-| CC Act 3a: The history nobody ingested | a year of raw audit read in place (federation) | own one-year range |
-| CC Act 3b: The history ingested at a predictable price | the same year on the frozen tier | own one-year range |
-| CC Act 4: Hunting agent - the agent that keeps looking | findings of the scheduled hunt; it surfaces the TV-box lead | Last 24 hours |
-| CC Act 5: Edge devices on no one's radar | the TV box, hypothetical (scenario B): the evidence behind the lead | 2026-10-22 to 2026-11-11 |
+| 0:00 | **CC Act 0: The realms you usually do not watch** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
+| 1:30 | **CC Act 1: One cabinet, the contractor's view** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
+| 3:00 | **CC Act 2: The same blip across the whole estate, not on SOC's radar** | Twenty stores in one look: 46 setpoint changes in 3 stores, one of them from inside the store. |
+| 5:30 | **CC Act 3: The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
+| 8:00 | **CC Act 4: Hunting agent - the agent that keeps looking** | Nobody asked, and something is going on: findings with evidence, including a POS terminal talking to the refrigeration controller. |
+| 11:30 | **CC Act 5: The POS that nobody watched** | The evidence: a 4 GB night-time download, its CPU, its disk, the first time it reached the controller. |
+| 14:30 | | Rules detect, the agent hunts, the same language everywhere. |
 
-> **Status of this runbook.** The commands below are the ones the author ran, collected in order. A run from an empty AWS
-> account and a new Elastic deployment, following only this file, has **not** been done yet. Expect to fix a step or two,
-> and please note them in `docs/decisions.md`.
+`docs/story-flow.md` has the stage script and `docs/plan-simplified.md` the decisions behind this version.
 
 ## 1. What you need
 
-**On your machine:** Python 3.11+, Docker (for the collector), Terraform 1.5+, AWS CLI v2, `make`. macOS or Linux
-(federation is not supported on Windows).
+**On your machine:** Python 3.11+, Docker (for the collector), Terraform 1.5+, AWS CLI v2, `make`.
 
-**AWS:** an account and a CLI profile that can create an S3 bucket (versioning and Object Lock), an SQS queue with a
-dead-letter queue, and about 22 IAM users (20 stores, the collector, federation) with policies. The bucket and the Elastic deployment should be in the same region
-(default `eu-central-1`). If your organisation requires resource tags, set them in step 3.
+**AWS:** an account and a CLI profile that can create an S3 bucket (versioning and Object Lock), an SQS queue with a dead-letter
+queue, and about 22 IAM users. The collector reads the queue; the generator and replay write with per-store keys.
 
-**Elastic Cloud Hosted** (not Serverless: federation is unavailable there), on AWS, same region as the bucket:
+**An Elastic Cloud Serverless Security project** (not Hosted: custom panels exist only on Serverless, Preview):
 
 | Needed | Why |
 |---|---|
-| Stack **9.5.x**, pinned (the author used 9.5.6) | Dashboards API, Workflows and Agent Builder (the last two are preview) |
-| **Enterprise** subscription (a trial is fine; mind the expiry) | ES\|QL data federation, frozen tier |
-| Elasticsearch, Kibana, **ML node**, **Integrations Server** (Fleet), Elastic Security | collector, ML, rules |
-| A **frozen node** | Act 3b only (searchable snapshot, `make history-frozen`) |
-| User setting `esql.federation.enabled: true` (restarts nodes) and, for the UI, `xpack.dataFederation.enabled: true` | federation is off by default on 9.5 |
-| An LLM connector (Elastic-managed ones are preconfigured), Agent Builder and Workflows on | the agent and the hunt |
-| An API key with full privileges | the demo creates Fleet policies, ML jobs, rules, dashboards, agents and snapshots; a narrower role has not been worked out |
+| Elasticsearch URL, Kibana URL and an API key with full privileges | everything is created through the APIs |
+| Fleet (managed by Serverless) | the collector enrols there |
+| ML, detection rules, Agent Builder, Workflows and an LLM connector | the POS jobs, rules, the agent and the hunt |
 
-AlertZero (Elastic Security's agentic layer) is **not offered** on 9.5.6 Cloud Hosted. The hunt is built from Workflows and
-Agent Builder instead and is labelled "AlertZero pattern, preview". See `docs/decisions.md`.
+AlertZero is not used: the hunt is built from Workflows and Agent Builder and labelled "AlertZero pattern, preview".
 
-## 2. Install
+## 2. Install and configure
 
 ```bash
-make install        # creates .venv and installs requirements.txt
-make test           # 50+ tests, offline, about 30 seconds
-```
-
-Every command on this machine prints a few `hashlib ... blake2b` lines on some pyenv builds. They are harmless noise.
-
-## 3. Configure
-
-```bash
+make install
+make test                       # offline, about 40 seconds
 cp .env.example .env
 cp infra/terraform.tfvars.example infra/terraform.tfvars
 ```
 
-Fill in `.env`: `AWS_PROFILE`, `ELASTICSEARCH_URL`, `KIBANA_URL`, `ELASTIC_API_KEY`, `ELASTIC_STACK_VERSION`. Everything else
-(`COLDCHAIN_BUCKET`, the queue URLs) is written by `make setup-aws`. `ELASTIC_CLOUD_ID`, `FLEET_ENROLLMENT_TOKEN` and
-`FEDERATION_ROLE_ARN` are not read by the code today (the enrollment token and the federation identity are created by the
-setup steps and kept in `.secrets/`).
+In `.env` set `AWS_PROFILE` and the three Serverless values:
 
-In `infra/terraform.tfvars` set your profile, region and tags. The defaults in `variables.tf` are the author's
-(`project_tag`, `team`, `keep_until`: an Elastic SA sandbox policy that denies creates without tags). Use a lease of 30 to 90
-days. Sign in first (`aws sso login --profile <p>`, or `aws login`).
-
-## 4. Set up, once
-
-```bash
-make setup
+```
+ELASTIC_CLOUD_SERVERLESS_ELASTICSEARCH=https://....es.<region>.<cloud>.elastic.cloud
+ELASTIC_CLOUD_SERVERLESS_KIBANA=https://....kb.<region>.<cloud>.elastic.cloud
+ELASTIC_CLOUD_SERVERLESS_API_KEY=...
 ```
 
-This runs, in order: `setup-aws` (Terraform: bucket with Object Lock and versioning, SQS and DLQ, per-store write-only IAM,
-collector and federation read identities; it writes `.env`, `store-keys.json` and `.secrets/`), `verify-infra` (store
-isolation, Object Lock, queue events), `setup-elastic` (templates, pipelines, knowledge-base lookup indices, Fleet policy and
-the AWS S3 integration), `collector-up` (an Elastic Agent container enrolled in Fleet, reading the queue) and `federation`
-(the data source and datasets over `raw/`; there are no files yet, so `make federation-check` comes after both backfills).
+The code copies them over `ELASTICSEARCH_URL`, `KIBANA_URL` and `ELASTIC_API_KEY` (`coldchain/envfile.py`); set
+`COLDCHAIN_TARGET=hosted` to use the old values instead. Set your tags in `infra/terraform.tfvars`. Sign in to AWS first
+(`aws sso login --profile <p>` or `aws login`).
 
-Check: `docker ps` shows `coldchain-collector`; `make verify-infra` ends with all checks passing.
-
-Then the history. This is the long step (tens of thousands of S3 PUTs; restartable, it skips what exists):
+## 3. Set up, once
 
 ```bash
-make backfill            # raw/ 12 months of audit, 7 days of flows; detect/ 35 days indexed (measured: 56,159 files, 506 MB, about 90 minutes)
-make backfill-epilogue   # scenario B: the TV box (hypothetical)
-```
-
-Wait until the collector has drained the queue (Kibana > Discover on `metrics-coldchain.case-default`, about 24 million
-documents; `python -m coldchain.reingest telemetry --dry-run` lists hours that did not arrive), then:
-
-```bash
-make federation-check    # one query per dataset, with timings (needs both backfills: the TLS dataset is scenario B)
-make baselines           # what is normal for the Act 2 tiles, measured from the cluster
-make epilogue            # ML jobs and datafeeds over the epilogue window, the new-terms rule (disabled)
-make history-frozen      # Act 3b: needs the frozen node; reads raw/ with your AWS profile, about 2 minutes
-make sources             # Act 0 catalog, the "one question, three places" timings and the cross-source correlation (about 6 minutes: counts the raw files in place)
-make correlation         # only the cross-source correlation (about 80 s); run it again after the attack to see today's visits
-make content             # dashboards, detection rules (disabled), the agent, the scheduled hunt
+make setup                  # AWS (Terraform), the Elastic side on Serverless, the collector
+make backfill               # a year of audit and a week of telemetry: about 30 minutes, about 15,000 objects
+make backfill-pos           # the POS scenario (hypothetical)
+make baselines epilogue     # what is normal for the tiles; the POS ML jobs and the new-terms rule (disabled)
+make sources content        # the Act 0 catalog; dashboards, rules (disabled), the agent, the hunt
 make verify
 ```
 
-`make hunt` also **starts a schedule**: the workflow runs the agent every 30 minutes and uses the deployment's LLM each time.
-Stop it with `python -m coldchain.hunt delete` (or set `enabled: false` in the workflow).
+Check: `docker ps` shows `coldchain-collector`; `python -m coldchain.fleet status` says the agent is online.
 
-## 5. Run a demo
+`make hunt` also **starts a schedule**: the workflow runs the agent every 30 minutes and uses the project's LLM each time. Stop it
+with `python -m coldchain.hunt delete`.
 
-Make sure the collector is up (`docker ps`) and your AWS session is valid.
+## 4. Run the demo
 
-```bash
-make demo        # live on the real clock, waits for `make restore`
-make rehearse    # the same, hands-off: setpoints are restored by themselves after about 9 minutes
-make restore     # second terminal: the "go" for containment (otherwise it restores after 30 minutes)
-```
-
-Before T0, `make demo` writes and indexes a day of normal data so the dashboards start with context: measured, the first time
-after a day idle that is about 15 minutes (9,300 files, 11 minutes to write, a few to index); a run right after a reset only
-fills the gap since the last one. It then prints `T0=...` and the exact cleanup command (UTC; Kibana shows your browser's time zone). Open Acts 1 and 2 on "Last 24 hours" with auto-refresh.
-
-| After T0 | You should see |
-|---|---|
-| about 5 s | 46 setpoint changes to +50 in S07, S11 and S19 (S07's from an address inside the store) |
-| about 1 min | rule 1 alerts, one per store |
-| about 10 min | rule 2 ("warm, no defrost") and the warm tile (`make demo` only) |
-| 40 to 60 min | the run ends and its raw files are written to S3 (Act 3 shows them until cleaned) |
-
-The scripted agent question: `make agent-ask`, or paste it from `docs/story-flow.md` into Agent Builder.
-
-## 6. Between runs
-
-A run leaves indexed documents, alerts, hunt findings and (when it ends) raw files in the bucket. The run prints the
-command to use. `SINCE` is the replay's start (T0 minus 3 minutes, UTC): it is after the pre-roll, so the day of context
-stays and the next demo starts quickly. Measured on a rehearsal: it removed 101 audit, 26,880 telemetry, 1,691 summary and
-5,760 probe documents, 6 alerts, the hunt findings and 49 raw file versions, and rebuilt Act 3b, in about 4 minutes:
+Start it **about 4 minutes before you present**, so that the attack lands at minute 2:
 
 ```bash
-make reset-demo SINCE=2026-11-16T08:50:00Z                 # dry run for the raw files
-make reset-demo SINCE=2026-11-16T08:50:00Z DELETE=1        # also deletes them and rebuilds Act 3b
+make demo        # live on the real clock: a 6 hour pre-roll (about 3 minutes), then T0 about 3 minutes later
+make restore     # a second terminal: the "go" for containment (otherwise it restores after 30 minutes)
 ```
 
-`clean-raw` (called by the above) lists or deletes the `raw/` object versions written since that time, with governance
-bypass. It refuses a time older than a week without `--force`, because that would reach the backfilled history. Deleting is
-permanent.
+`make demo` prints `T0=...` (UTC) and the cleanup command. Open Acts 1, 2 and 4 on "Last 24 hours" with auto-refresh. After T0:
+the 46 setpoint changes after 5 s, rule 1 alerts after about 1.5 minutes, rule 2 and the warm tile after about 10 minutes.
+`make rehearse` is the hands-off variant (it restores by itself after about 9 minutes).
 
-## 7. Tear down
+## 5. Between runs
 
 ```bash
-make teardown
+make reset-demo SINCE=<replay start, printed by the run>
 ```
 
-Removes the hunt, the frozen copy, the collector and the AWS stack (all object versions first). The Elastic Cloud deployment
-is yours to delete in the console, and the frozen node costs money while it exists.
+Removes the indexed run, the alerts and the hunt findings, and measures the Act 0 catalog again. `SINCE` is the replay's start
+(T0 minus 3 minutes), after the pre-roll, so the context stays and the next run starts quickly.
 
-## 8. Things that will bite you
+## 6. Tear down
 
-- **AWS session expired** (`LoginRefreshRequired`): run `aws login` or `aws sso login`.
+`make teardown` removes the hunt, the collector and the AWS stack. The Serverless project is yours to delete in the Elastic Cloud
+console, or empty it with `python -m coldchain.wipe --yes` (dry run without `--yes`).
+
+## 7. Things that will bite you
+
+- **AWS session expired** (`LoginRefreshRequired`): `aws login` or `aws sso login`.
 - **Collector not running:** `make demo` writes to S3 but nothing is indexed. `make collector-up`, `make collector-logs`.
-- **Act 3a empty or slow:** federation reads a year of files, about 75 seconds a query, one federated panel per dashboard.
-  The dashboard sets its own one-year range because Kibana applies the picker to `@timestamp`.
-- **File limit:** a federated dataset lists at most 10,000 files on 9.5.6, so raw audit is one file per store per day. Say
-  "default cap" on stage.
-- **Rules:** `make demo` and `make rehearse` enable them; `clean-run` switches them off again.
-- **Two runs on top of each other:** clean first, or Acts 2 and 3 show both.
-- **Federation is experimental,** Workflows and Agent Builder are preview. Say so on stage.
-- **Time zones:** everything is UTC in the files and logs; the stage clock is Colmar (UTC+1 in winter).
+- **Custom panels are a Preview:** their rendering is not visible through the API; look at each dashboard once after a push.
+- **`make dashboards` overwrites edits** made in the Kibana UI. Ask for an edit to be mirrored into `coldchain/dashboards.py`.
+- **A second collector on the same queue** (for example the old Hosted one) takes messages and indexes them elsewhere.
+- **The POS scenario is dated** 2026-10-22 to 2026-11-11: its dashboard sets its own range.
+- **Time zones:** files and logs are UTC; the stage clock is Colmar (UTC+1 in winter).
 
-## 9. Repository map
+## 8. Repository map
 
 | Path | What |
 |---|---|
-| `coldchain/` | the generator (`chain`, `telemetry`, `audit`, `network`, `scenario_b`), `backfill`, `replay`, the Elastic side (`elastic`, `fleet`, `federation`, `rules`, `ml`, `epilogue`, `dashboards`, `agent`, `hunt`, `frozen`), and `infra` |
-| `config/` | the chain, the attack, the defrost schedule, scenario B |
+| `coldchain/` | the generator (`chain`, `telemetry`, `audit`, `network`, `scenario_b` = the POS scenario), `backfill`, `replay`, `prep`, the Elastic side (`elastic`, `fleet`, `rules`, `epilogue` = POS ML, `agent`, `hunt`, `sources`), the dashboards (`dashboards`, `panels`), `wipe`, `infra`, `envfile` |
+| `config/` | the chain (4 POS lanes and a back-office POS per store), the attack, the POS scenario, the defrost schedule |
 | `elastic/lookup/` | the knowledge-base seed files (generated by `make lookups`) |
 | `infra/` | Terraform for the AWS side |
 | `compose/collector/` | the central collector (Elastic Agent in Docker) |
-| `tests/` | offline tests |
-| `docs/` | storyboard, data model (06b), story flow, decisions and measurements |
+| `docs/` | the plan, decisions and measurements, the story flow, the original storyboard and data model (06b) |
 
-Not in this repo: a store-in-a-box (Elastic Agent, Logstash, S3 output on a store). Every store, S07 included, is simulated
-by the generator writing to S3 with its own write-only credentials.
+Not in this repo: a store-in-a-box. Every store, S07 included, is simulated by the generator writing to S3 with its own write-only
+credentials.

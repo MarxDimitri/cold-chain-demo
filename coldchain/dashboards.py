@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 import requests
 
 from .elastic import client
+from . import panels
 from .envfile import load_env
 
 T = "@timestamp >= ?_tstart AND @timestamp < ?_tend"
@@ -66,8 +67,9 @@ class Dash:
 ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch"),
         ("coldchain-act1a-cabinet", "Act 1", "One cabinet"),
         ("coldchain-act1b-estate", "Act 2", "The whole estate"),
+        ("coldchain-act3-history", "Act 3", "The history nobody looked at"),
         ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
-        ("coldchain-epilogue-edge", "Act 5", "Edge devices")]
+        ("coldchain-pos-evidence", "Act 5", "The POS lead")]
 NAV_HEIGHT = 3
 
 
@@ -155,61 +157,22 @@ def lines(d: Dash, title: str, q: str, x_col: str, y_cols: list[str], w: int = 4
     d.add(title, cfg, w, h, x, query=q, params=params)
 
 
-# --- Act 0: every source of truth, one language ----------------------------------------------------------------------
+def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10, x: int = 0) -> None:
+    """A Serverless custom panel (`custom_content`): one ES|QL query, filled into an HTML, CSS and Liquid template."""
+    d.panels.append({"type": "custom_content", "grid": {"x": x, "y": d.y, "w": w, "h": h},
+                     "config": {"title": title, "template": template, "esql_query": [q]}})
+    d.queries.append((title, q, {}))
 
-TIER_COLORS = {"Indexed": "#6092C0", "Frozen tier": "#9170B8", "Raw in S3": "#54B399", "Knowledge base": "#F5A700", "Produced": "#D36086"}
-ALL_TIME = {"from": "now-10y", "to": "now"}  # these panels read a catalog without @timestamp: the picker must not matter
 
+# --- Act 0: the realms you usually do not watch ------------------------------------------------------------------------
 
 def act0() -> Dash:
     d = Dash("coldchain-act0-sources", "CC Act 0: The realms you usually do not watch",
-             "Every dataset the demo uses, in five tiers, all read with ES|QL. Counts measured with `make sources`. Synthetic data.",
-             time=("now-1y", "now"))
-    # The streetlight effect, as a chart: we search where the light is (the live index, 35 days); the dark is the year of
-    # history that only exists in raw files and on the frozen tier. It sits on top, under the navigation strip.
-    lit = ('FROM cc-history-audit | WHERE @timestamp >= NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
-           '| SORT week')
-    dark = ('FROM cc-history-audit | WHERE @timestamp < NOW() - 35 days | STATS events = COUNT(*) BY week = BUCKET(@timestamp, 1 week) '
-            '| SORT week')
-    layers = [{"type": "bar", "data_source": esql(q), "x": {"column": "week"},
-               "y": [{"column": "events", "label": label, "color": {"type": "static", "color": color}}]}
-              for q, label, color in ((dark, "In the dark: only in raw files and on the frozen tier", "#343741"),
-                                      (lit, "Under the streetlight: the live index, 35 days", "#F5A700"))]
-    d.add("Store audit events per week: what the light covers, and what it does not",
-          {"type": "xy", "layers": layers, "time_range": {"from": "now-1y", "to": "now"},
-           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "audit events", "visible": True}}},
-           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}, 48, 10, query=dark)
-    d.queries.append(("streetlight (lit layer)", lit, {}))
-    d.row(10)
-    d.panels.append(md("## Every source of truth, one platform, one language\n"
-                       "Telemetry, audit, network flows, a year of raw history in S3, the knowledge base, and what the agent finds: "
-                       "different shapes, different storage, different cost. **One platform and one language, ES|QL**, reads all of them, "
-                       "so you can ask a question nobody modelled in advance. Every tile, chart and table on this page is an ES|QL query "
-                       "(raw files are counted once with `make sources`).\n\n"
-                       "```\nFROM logs-coldchain.audit-default     // live index: 35 days, milliseconds\n"
-                       "FROM cc-history-audit               // frozen tier: 12 months, about a second\n"
-                       "FROM raw_store_audit                // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
-                       "FROM kb-assets | ...                // the knowledge base: context joined to any of them\n```", h=9, d=d))
-    d.row(9)
-    for i, tier in enumerate(TIER_COLORS):
-        q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
-        d.add(tier, {"type": "metric", "data_source": esql(q), "time_range": ALL_TIME, "metrics": [
-            {"type": "primary", "column": "rows", "label": " ", "color": {"type": "static", "color": TIER_COLORS[tier]}},
-            {"type": "secondary", "column": "sources", "label": "sources"}]}, 9, 6, 1 + 9 * i, query=q)
-    d.row(6)
-    q = "FROM kb-sources | WHERE rows > 0 | EVAL size = ROUND(LOG10(rows), 2) | SORT size DESC | KEEP source, tier, size"
-    lines(d, "How big: orders of magnitude of rows (log10)", q, "source", ["size"], w=24, h=14, by="tier", kind="bar", ytitle="log10 rows")
-    d.panels[-1]["config"]["time_range"] = ALL_TIME
-    q = "FROM kb-sources | WHERE days IS NOT NULL | SORT days DESC | KEEP source, tier, days"
-    lines(d, "How far back each source reaches (days)", q, "source", ["days"], w=24, h=14, x=24, by="tier", kind="bar", ytitle="days")
-    d.panels[-1]["config"]["time_range"] = ALL_TIME
-    d.row(14)
-    q = ("FROM kb-sources | SORT tier_order, rows DESC | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd\", first_seen), last_seen = DATE_FORMAT(\"yyyy-MM-dd\", last_seen) "
-         "| KEEP tier, source, what, rows, first_seen, last_seen, ask_with")
-    cols = [("tier", 120), ("source", 250), ("what", 640), ("rows", 110), ("first_seen", 100), ("last_seen", 100), ("ask_with", 380)]
-    d.add("Where each source lives and how to ask it", {"type": "data_table", "time_range": ALL_TIME, "data_source": esql(q),
-          "metrics": [{"column": c, "width": w} for c, w in cols]}, 48, 17, query=q)
-    d.row(17)
+             "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
+             time=("now-24h", "now"))
+    q = "FROM kb-sources | SORT tier_order, rows DESC | KEEP tier, label, what, rows, days"
+    custom(d, "The streetlight effect: we search where the light is", q, panels.REALMS, w=48, h=22)
+    d.row(22)
     return d
 
 
@@ -267,6 +230,12 @@ def act1() -> Dash:
     metric(d, "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T} | STATS alerts = COUNT(*)", "alerts", x=36,
            normal=("open-alerts", False))
     d.row(6)
+    q = (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
+         "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
+         "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
+         "AND coldchain.case.setpoint > 5 BY store = retail.store.id | SORT store")
+    custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
+    d.row(9)
     # One query over telemetry and audit: every 5-minute slot has a value, so the red line sits at 0 between changes.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
          f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL} "
@@ -299,84 +268,103 @@ def act1() -> Dash:
     table(d, "What central IT knows about the estate (inventory), and what reports live",
           'FROM kb-assets | EVAL role = COALESCE(retail.device.role, "cabinet") | STATS devices = COUNT(*) BY role '
           '| EVAL live_feed = CASE(role == "cabinet", "telemetry and audit", role == "temperature-logger", "probe readings", '
-          'role == "system-manager", "audit and flows", "inventory only") | SORT devices DESC | KEEP role, devices, live_feed',
+          'role == "system-manager", "audit and flows", role IN ("pos-lane", "pos-backoffice"), "network flows (scenario)", "inventory only") | SORT devices DESC | KEEP role, devices, live_feed',
           ["role", "devices", "live_feed"], h=9)
     d.row(9)
     return d
 
 
-# --- Epilogue: the TV box (hypothetical) -------------------------------------------------------------------------
+# --- Act 3: the history nobody looked at ---------------------------------------------------------------------------------
 
-# The epilogue is a fixed three-week story: its panels do not follow the time picker.
+OUTSIDE_LOGINS = ('WHERE event.action == "logged-in" AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24") '
+                  'AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")')
+YEAR = {"from": "now-1y", "to": "now"}
+
+
+def act3() -> Dash:
+    d = Dash("coldchain-act3-history", "CC Act 3: The history nobody looked at",
+             "A year of store audit. The same internet address logged in to three stores months before the attack. Synthetic data.",
+             time=("now-1y", "now"))
+    metric(d, "Events in the history", "FROM logs-coldchain.audit-default | STATS events = COUNT(*)", "events", w=16)
+    metric(d, "Days of history", 'FROM logs-coldchain.audit-default | STATS days = DATE_DIFF("days", MIN(@timestamp), MAX(@timestamp))', "days", w=16, x=16)
+    metric(d, "Stores an outsider logged in to", f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} | STATS stores = COUNT_DISTINCT(retail.store.id)",
+           "stores", w=16, x=32)
+    for pn in d.panels:
+        pn["config"]["time_range"] = YEAR
+    d.row(6)
+    q = (f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} "
+         "| STATS first_seen = MIN(@timestamp) BY store = retail.store.id | EVAL days_ago = DATE_DIFF(\"days\", first_seen, NOW()), "
+         "first_seen_txt = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen) | SORT first_seen | KEEP store, days_ago, first_seen_txt")
+    custom(d, "When the same address first logged in to each store", q, panels.FIRST_VISITS, w=48, h=12)
+    d.row(12)
+    q = (f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} "
+         "| STATS stores = COUNT_DISTINCT(retail.store.id) BY week = BUCKET(@timestamp, 1 week)")
+    cfg = {"type": "xy", "layers": [{"type": "bar", "data_source": esql(q), "x": {"column": "week"},
+                                     "y": [{"column": "stores", "label": "stores with an outside login", "color": {"type": "static", "color": RED}}]}],
+           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "stores per week", "visible": True}}},
+           "legend": {"visibility": "hidden"}, "time_range": YEAR}
+    d.add("Outside logins per week over the year", cfg, 48, 10, query=q)
+    d.row(10)
+    return d
+
+
+# --- Act 5: the POS lead (hypothetical) ----------------------------------------------------------------------------------
+
+# The POS scenario is a fixed three-week story: its panels do not follow the time picker.
 ET = '@timestamp >= "2026-10-22T00:00:00Z" AND @timestamp < "2026-11-12T00:00:00Z"'
 
-EVIDENCE = """FROM raw_store_tls
+EVIDENCE = """FROM logs-network_traffic.tls-pos
 | WHERE @timestamp >= "2026-10-22T00:00:00Z" AND @timestamp < "2026-11-12T00:00:00Z" AND retail.store.id == "S07"
 | EVAL host.ip = TO_STRING(source.ip), tls.client.server_name = TO_STRING(tls.client.server_name)
 | LOOKUP JOIN kb-assets-by-ip ON host.ip
 | LOOKUP JOIN kb-device-profiles ON retail.device.role, tls.client.server_name
 | WHERE profile.allowed IS NULL
 | STATS received = SUM(destination.bytes), chunks = COUNT(*), nights = COUNT_DISTINCT(DATE_TRUNC(1 day, @timestamp)),
-        ja3 = VALUES(tls.client.ja3) BY host.name, tls.client.server_name
-| EVAL received_gb = ROUND(received / 1073741824.0, 2)
+        first_seen = MIN(@timestamp), ja3 = VALUES(tls.client.ja3) BY host = host.name, server = tls.client.server_name
+| EVAL received_gb = ROUND(received / 1073741824.0, 2), first_seen_txt = DATE_FORMAT("yyyy-MM-dd", first_seen)
 | SORT received DESC
-| KEEP host.name, tls.client.server_name, received_gb, chunks, nights, ja3
-| LIMIT 10"""
+| KEEP host, server, received_gb, chunks, nights, first_seen_txt, ja3
+| LIMIT 3"""
 
 
-def epilogue() -> Dash:
-    d = Dash("coldchain-epilogue-edge", "CC Act 5: Edge devices on no one’s radar",
-             "Scenario B, hypothetical and synthetic: a TV box that downloads 4.6 GB over nine nights.",
+def pos() -> Dash:
+    d = Dash("coldchain-pos-evidence", "CC Act 5: The POS that nobody watched",
+             "Hypothetical scenario, synthetic data: a back-office POS PC downloads 4 GB at night and then reaches the refrigeration system manager.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
-    d.panels.append(md("## Follow the lead: the quiet TV box\n**Hypothetical scenario, synthetic data.** The hunting agent (Act 4) found a TV box "
-                       "talking to a store's system manager, a path no rule watches. This is the evidence. Detection runs on the indexed "
-                       "flow summaries and the edge metrics. The evidence table at the bottom reads the raw TLS records "
-                       "**in place from S3** (data federation, experimental).", h=4, d=d))
-    d.row(4)
-    s = "logs-netflow.summary-epilogue"
-    lines(d, "Bytes received per night: the S07 TV box against its 19 peers (MB)",
-          f'FROM {s} | WHERE {ET} AND retail.device.role == "tv-box" '
-          "| STATS b = SUM(destination.bytes) BY day = BUCKET(@timestamp, 1 day), host.name "
-          '| EVAL who = CASE(host.name == "S07-TVBOX-01", "S07-TVBOX-01", "average peer") '
-          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=24, h=12, by="who", kind="bar")
-    lines(d, "Signage player CPU (S07-SIG-02 against its peers)",
-          "FROM logs-signage.cms-epilogue | WHERE " + ET + ' | EVAL who = CASE(host.name == "S07-SIG-02", "S07-SIG-02", "average peer") '
-          "| STATS cpu = ROUND(AVG(host.cpu.usage) * 100, 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["cpu"], w=24, h=12,
-          x=24, by="who")
-    d.row(12)
-    lines(d, "Signage free storage (%)", "FROM logs-signage.cms-epilogue | WHERE " + ET +
-          ' | EVAL who = CASE(host.name == "S07-SIG-02", "S07-SIG-02", "average peer") '
-          "| STATS free = ROUND(AVG(coldchain.edge.storage.free_pct), 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["free"],
-          w=24, h=10, by="who")
-    lines(d, "TV box power draw (W)", "FROM logs-power.plug-epilogue | WHERE " + ET +
-          ' | EVAL who = CASE(host.name == "S07-PLUG-01", "S07 TV box", "average peer") '
-          "| STATS watts = ROUND(AVG(coldchain.edge.power.watts), 1) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["watts"],
-          w=24, h=10, x=24, by="who")
-    d.row(10)
-    table(d, "Internal flows in store S07, first seen",
-          f'FROM {s} | WHERE {ET} AND retail.store.id == "S07" AND CIDR_MATCH(source.ip, "10.7.0.0/16") '
-          'AND CIDR_MATCH(destination.ip, "10.7.0.0/16") '
-          "| STATS first_seen = MIN(@timestamp), flows = COUNT(*) BY source.ip, destination.ip, destination.port "
-          "| SORT first_seen DESC | LIMIT 10", ["first_seen", "source.ip", "destination.ip", "destination.port", "flows"], h=9)
+    custom(d, "What the S07 back-office POS talked to that its profile does not allow", EVIDENCE, panels.POS_EVIDENCE, w=48, h=9)
     d.row(9)
-    d.panels.append(md("### Evidence read in place (federation, experimental)", h=2, d=d))
-    d.row(2)
-    table(d, "Not allowed by the device profile: server, volume, nights, JA3", EVIDENCE,
-          ["host.name", "tls.client.server_name", "received_gb", "chunks", "nights", "ja3"], h=7)
-    d.row(7)
+    s = "logs-netflow.summary-pos"
+    lines(d, "Bytes received per night: the S07 back-office POS against its 19 peers (MB)",
+          f'FROM {s} | WHERE {ET} AND retail.device.role == "pos-backoffice" '
+          "| STATS b = SUM(destination.bytes) BY day = BUCKET(@timestamp, 1 day), host.name "
+          '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
+          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=24, h=12, by="who", kind="bar")
+    lines(d, "CPU: the S07 back-office POS against its peers (%)",
+          "FROM logs-pos.terminal-pos | WHERE " + ET + ' AND retail.device.role == "pos-backoffice" '
+          '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
+          "| STATS cpu = ROUND(AVG(host.cpu.usage) * 100, 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["cpu"], w=24, h=12, x=24, by="who")
+    d.row(12)
+    lines(d, "Free disk (%)", "FROM logs-pos.terminal-pos | WHERE " + ET + ' AND retail.device.role == "pos-backoffice" '
+          '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
+          "| STATS free = ROUND(AVG(coldchain.pos.disk_free_pct), 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["free"], w=24, h=10, by="who")
+    table(d, "First time inside store S07: who called whom",
+          f'FROM {s} | WHERE {ET} AND retail.store.id == "S07" AND CIDR_MATCH(source.ip, "10.7.0.0/16") '
+          'AND CIDR_MATCH(destination.ip, "10.7.0.0/16") AND retail.device.role == "pos-backoffice" '
+          "| STATS first_seen = MIN(@timestamp), flows = COUNT(*) BY from = host.name, to = destination.ip, port = destination.port "
+          "| EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd\", first_seen) | SORT first_seen DESC | LIMIT 8",
+          ["first_seen", "from", "to", "port", "flows"], w=24, h=10, x=24)
+    d.row(10)
     return d
 
 
 def hunt() -> Dash:
     d = Dash("coldchain-hunt-findings", "CC Act 4: Hunting agent - the agent that keeps looking",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
-    d.panels.append(md("## The hunt: an agent that keeps looking\nNo alert fired for these. Every 30 minutes a workflow asks the SOC agent to sweep the "
-                       "estate (live data, a year of raw history read in place, device profiles, exposure) and records what is abnormal, "
-                       "with evidence and a proposed action. It proposes, it runs nothing. **AlertZero is not offered on this deployment "
-                       "(9.5.6 Cloud Hosted), so this is the same pattern built from Elastic Workflows and Agent Builder (preview).**\n\n"
-                       "**A lead worth following:** among the findings, a TV box in store S07 is talking to the system manager. Nothing "
-                       "alerted on that. Next, Act 5 looks at what the TV boxes are doing.", h=7, d=d))
-    d.row(7)
+    d.panels.append(md("## Nobody asked, and something is going on\nEvery 30 minutes a workflow asks the SOC agent to sweep the estate: live "
+                       "data, a year of history, device profiles, exposure. It records what is abnormal, with a proposed action. It proposes, it "
+                       "runs nothing. **AlertZero is not offered on every deployment, so this is the same pattern built from Elastic Workflows and "
+                       "Agent Builder (preview).**", h=5, d=d))
+    d.row(5)
     tiles = (("critical", "Critical findings", RED), ("high", "High findings", AMBER), ("medium", "Medium findings", "#6092C0"))
     for i, (sev, title, color) in enumerate(tiles):
         metric(d, title, f'FROM cc-hunt-findings | WHERE severity == "{sev}" | STATS findings = COUNT(*)', "findings", w=12, x=12 * i)
@@ -384,42 +372,17 @@ def hunt() -> Dash:
             {"lt": 1, "color": GREEN}, {"gte": 1, "color": color}]}
     metric(d, "Stores involved", "FROM cc-hunt-findings | STATS stores = COUNT_DISTINCT(stores)", "stores", w=12, x=36)
     d.row(6)
-    # Risk is the colour carrier: red from 85 (critical), amber from 60 (high), blue below. Column widths keep the text readable.
-    risk = {"type": "dynamic", "range": "absolute", "steps": [
-        {"lt": 60, "color": "#6092C0"}, {"gte": 60, "lt": 85, "color": AMBER}, {"gte": 85, "color": RED}]}
-    q = ("FROM cc-hunt-findings | SORT risk DESC, @timestamp DESC | EVAL seen = DATE_FORMAT(\"HH:mm\", @timestamp) "
-         "| KEEP seen, risk, severity, stores, title, tools, proposed_action")
-    cols = [("seen", 70), ("risk", 70), ("severity", 90), ("stores", 220), ("title", 440), ("tools", 230), ("proposed_action", 610)]
-    d.add("Findings, most severe first", {"type": "data_table", "data_source": esql(q), "metrics": [
-        {"column": c, "width": w, **({"apply_color_to": "background", "color": risk} if c == "risk" else {})} for c, w in cols]},
-        48, 12, query=q)
-    d.row(12)
-    for col, title in (("why_abnormal", "Why it is abnormal"), ("evidence", "The evidence")):
-        q = f"FROM cc-hunt-findings | SORT risk DESC, @timestamp DESC | KEEP risk, stores, {col}"
-        cols = [("risk", 70), ("stores", 260), (col, 1400)]
-        d.add(title, {"type": "data_table", "data_source": esql(q), "metrics": [
-            {"column": c, "width": w, **({"apply_color_to": "background", "color": risk} if c == "risk" else {})} for c, w in cols]},
-            48, 10, query=q)
-        d.row(10)
-    from .agent import TOOLS  # the questions the agent can ask: each one is an ES|QL query over the same data
-
-    def tool_md(tools: list[dict]) -> str:
-        return "".join(f"**`{t['id']}`**: {t['description']}\n\n```\n{t['query'].strip()}\n```\n\n" for t in tools)
-    d.panels.append(md("## What the agent asks: ES|QL, over every source\nThe agent has no private access to the data. Each tool is one ES|QL "
-                       "query over the indexed data, the raw history read in place and the knowledge base: the same language an analyst "
-                       "would type. The `tools` column above says which of these each finding came from.", h=4, d=d))
-    d.row(4)
-    half = (len(TOOLS) + 1) // 2
-    d.panels.append(md(tool_md(TOOLS[:half]), w=24, h=30, d=d))
-    d.panels.append(md(tool_md(TOOLS[half:]), w=24, h=30, d=d, x=24))
-    d.row(30)
+    q = ("FROM cc-hunt-findings | EVAL rank = CASE(severity == \"critical\", 0, severity == \"high\", 1, severity == \"medium\", 2, 3) "
+         "| SORT rank, @timestamp DESC | LIMIT 12 | EVAL stores_txt = MV_CONCAT(stores, \", \") "
+         "| KEEP severity, title, stores_txt, why_abnormal, proposed_action")
+    custom(d, "What the agent found", q, panels.FINDINGS, w=48, h=26)
+    d.row(26)
     return d
 
 
-# Ids are listed, not read from the builders: `hunt` imports the agent, which imports this module.
+# Ids are listed, not read from the builders.
 DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
-              "coldchain-hunt-findings": hunt,
-              "coldchain-epilogue-edge": epilogue}
+              "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos}
 
 
 # --- push / check ------------------------------------------------------------------------------------------------

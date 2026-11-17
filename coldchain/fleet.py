@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SECRETS = ROOT / ".secrets"
 POLICY_NAME = "cold-chain-collector"
 INTEGRATION_NAME = "cold-chain-detect-s3"
-PACKAGE, PACKAGE_VERSION = "aws_logs", "1.8.3"
+PACKAGE, PACKAGE_VERSION = "aws_logs", "2.1.1"
 INGEST_DATASET = "coldchain.ingest"
 PIPELINE = "coldchain-route"
 

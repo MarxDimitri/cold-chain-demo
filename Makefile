@@ -130,43 +130,44 @@ hunt-run:
 # ======================================================================================================================
 # Runbook targets: see README.md for the order, the prerequisites and what each step needs.
 # ======================================================================================================================
-.PHONY: help setup backfill backfill-epilogue epilogue baselines sources content verify teardown teardown-elastic \
+.PHONY: help setup backfill backfill-pos epilogue baselines sources content verify teardown teardown-elastic \
         clean-raw hunt-clear reset-demo
 
 help:
 	@echo "First time, in order (README.md has the details):"
 	@echo "  make install                 python venv and dependencies"
-	@echo "  make setup                   AWS (Terraform), Elastic side, collector, federation data source"
-	@echo "  make backfill                12 months raw + 35 days indexed history to S3 (long, restartable)"
-	@echo "  make backfill-epilogue       scenario B (the TV box) to S3"
-	@echo "  make baselines epilogue      knowledge base baselines, epilogue ML and rule"
-	@echo "  make sources content         the source catalog (Act 0), then dashboards, rules, agent, hunt"
-	@echo "  make verify                  infrastructure, pipeline, federation, dashboards, agent checks"
+	@echo "  make setup                   AWS (Terraform), Elastic side (Serverless), collector"
+	@echo "  make backfill                a year of audit and a week of telemetry to S3, indexed by the collector"
+	@echo "  make backfill-pos            the POS scenario (hypothetical) to S3"
+	@echo "  make baselines epilogue      knowledge base baselines, POS scenario ML jobs and rule"
+	@echo "  make sources content         the source catalog (Act 0), then dashboards (custom panels), rules, agent, hunt"
+	@echo "  make verify                  infrastructure, pipeline, dashboards, agent checks"
 	@echo "A demo:        make demo (live, 1x) | make rehearse (hands-off) | make restore (in a second terminal)"
 	@echo "Between runs:  make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"
 	@echo "Tear down:     make teardown   (the Elastic Cloud deployment itself is yours to delete)"
 
-# AWS (Terraform), then the Elastic side, then the collector, then the federation data source. Needs .env filled in (README step 3).
+# AWS (Terraform), then the Elastic side on the Serverless project, then the collector. Needs .env filled in (README step 3).
 setup: setup-aws verify-infra setup-elastic collector-up
 
-# The history: raw/ (12 months of audit, 7 days of flows) and detect/ (35 days indexed). Tens of thousands of PUTs; safe to re-run.
+# The history, through the collector into Elasticsearch: a year of store audit, and 7 days of telemetry, probes and flow summaries
+# (about 15,000 S3 objects). Re-running it writes the same objects again and the collector indexes them again: after an
+# interruption use `make backfill RESUME=--resume`, which skips objects that are already in the bucket.
 backfill:
-	set -a; . ./.env; set +a; $(PY) -m coldchain.backfill --target s3 --resume
+	set -a; . ./.env; set +a; $(PY) -m coldchain.backfill --target s3 $(RESUME)
 
-backfill-epilogue:
-	# No --resume on purpose: scenario B reuses the object keys of the main backfill for the same store and hour (netflow.summary,
-	# and S07's netflow.log), and --resume would skip them, leaving the epilogue streams about a third short.
-	set -a; . ./.env; set +a; $(PY) -m coldchain.scenario_b --target s3
+# The POS scenario (hypothetical): the back-office POS of S07 in the three weeks before the attack, in the `pos` namespace.
+backfill-pos:
+	set -a; . ./.env; set +a; $(PY) -m coldchain.scenario_b --target s3 $(RESUME)
 
 # After the detect/ history is indexed (the collector drains the queue): what is normal for the Act 2 tiles.
 baselines:
 	$(PY) -m coldchain.baselines
 
-# Act 0 and the "one question, three places" panel: measures every source (the raw files are counted in place, about 5 minutes)
+# Act 0: measures every source in the cluster and loads the kb-sources catalog (seconds).
 sources:
 	$(PY) -m coldchain.sources
 
-# Scenario B: ML jobs and datafeeds over the epilogue window, and the new-terms rule (created disabled).
+# The POS scenario: ML jobs and datafeeds over its window, and the new-terms rule (created disabled).
 epilogue:
 	$(PY) -m coldchain.epilogue setup
 	$(PY) -m coldchain.epilogue start
@@ -180,7 +181,7 @@ verify: verify-infra
 	$(PY) -m coldchain.dashboards check
 	$(PY) -m coldchain.agent check
 
-# Raw files of a run, dry run unless DELETE=1. Example: make clean-raw SINCE=2026-11-16T08:50:00Z DELETE=1
+# Objects a run wrote to the bucket (raw/ from the old layout), dry run unless DELETE=1. Example: make clean-raw SINCE=2026-11-16T08:50:00Z DELETE=1
 clean-raw:
 	@test -n "$(SINCE)" || (echo "usage: make clean-raw SINCE=<UTC time> [DELETE=1]"; exit 1)
 	set -a; . ./.env; set +a; $(PY) -m coldchain.infra clean-raw --since $(SINCE) $(if $(DELETE),--delete)
@@ -188,21 +189,19 @@ clean-raw:
 hunt-clear:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.hunt clear
 
-# Everything a run leaves behind: indexed data, alerts, hunt findings, and (listed, deleted with DELETE=1) the raw files.
+# Everything a run leaves behind: indexed data, alerts and hunt findings, and (listed, deleted with DELETE=1) bucket objects of the run.
 # SINCE is the replay's start (T0 minus 3 minutes; the run prints it): after the pre-roll, so the day of context stays.
-# With DELETE=1 the frozen copy of the history is rebuilt afterwards and the Act 0 is measured again (history only).
 reset-demo:
 	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"; exit 1)
 	$(MAKE) clean-run SINCE=$(SINCE)
 	$(MAKE) hunt-clear
 	$(MAKE) clean-raw SINCE=$(SINCE) $(if $(DELETE),DELETE=1)
-	$(if $(DELETE),$(MAKE))
+	$(MAKE) sources
 
-# Removes what the repo created: the hunt, the frozen copy, the collector and the AWS stack (bucket versions included).
-# The Elastic Cloud deployment is not touched: delete it in the Elastic Cloud console.
+# Removes what the repo created: the hunt, the collector and the AWS stack (bucket versions included).
+# The Serverless project is not touched: delete it in the Elastic Cloud console (or empty it with `python -m coldchain.wipe --yes`).
 teardown: teardown-elastic teardown-aws
 
 teardown-elastic:
 	-set -a; . ./.env; set +a; $(PY) -m coldchain.hunt delete
-	-set -a; . ./.env; set +a; $(PY) -m coldchain.frozen delete
 	-docker compose -f compose/collector/docker-compose.yml down

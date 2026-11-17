@@ -1,7 +1,7 @@
-{"retail": {"device": {"role": "tv-box"}}, "tls": {"client": {"server_name": "update.tvbox-vendor.example"}}, "profile": {"allowed": true}}
-{"retail": {"device": {"role": "tv-box"}}, "tls": {"client": {"server_name": "ntp.example"}}, "profile": {"allowed": true}}
-{"retail": {"device": {"role": "signage-player"}}, "tls": {"client": {"server_name": "cdn.signage-vendor.example"}}, "profile": {"allowed": true}}
-{"retail": {"device": {"role": "signage-player"}}, "tls": {"client": {"server_name": "ntp.example"}}, "profile": {"allowed": true}}
+{"retail": {"device": {"role": "pos-lane"}}, "tls": {"client": {"server_name": "pay.gateway.example"}}, "profile": {"allowed": true}}
+{"retail": {"device": {"role": "pos-lane"}}, "tls": {"client": {"server_name": "ntp.example"}}, "profile": {"allowed": true}}
+{"retail": {"device": {"role": "pos-backoffice"}}, "tls": {"client": {"server_name": "updates.pos-vendor.example"}}, "profile": {"allowed": true}}
+{"retail": {"device": {"role": "pos-backoffice"}}, "tls": {"client": {"server_name": "ntp.example"}}, "profile": {"allowed": true}}
 {"retail": {"device": {"role": "system-manager"}}, "tls": {"client": {"server_name": "telemetry.vendor-cloud.example"}}, "profile": {"allowed": true}}
 {"retail": {"device": {"role": "system-manager"}}, "tls": {"client": {"server_name": "ntp.example"}}, "profile": {"allowed": true}}
 {"retail": {"device": {"role": "store-server"}}, "tls": {"client": {"server_name": "telemetry.vendor-cloud.example"}}, "profile": {"allowed": true}}

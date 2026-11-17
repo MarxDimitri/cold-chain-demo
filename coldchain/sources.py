@@ -39,6 +39,24 @@ SOURCES: list[tuple[str, str, str, bool]] = [
 ]
 
 
+LABELS = {'logs-coldchain.case-default': 'Cabinet telemetry',
+          'logs-coldchain.audit-default': 'Controller audit',
+          'logs-coldchain.probe-default': 'Independent probes',
+          'logs-netflow.summary-default': 'Network flows',
+          'logs-netflow.summary-pos': 'POS network flows',
+          'logs-network_traffic.tls-pos': 'POS TLS sessions',
+          'logs-pos.terminal-pos': 'POS terminal health',
+          'kb-assets': 'Asset inventory',
+          'kb-assets-by-ip': 'Assets by address',
+          'kb-controller-limits': 'Controller limits',
+          'kb-device-profiles': 'Device profiles',
+          'kb-manuals': 'Manual facts',
+          'kb-regulations': 'Regulations',
+          'kb-baselines': 'Baselines',
+          '.alerts-security.alerts-default': 'Alerts',
+          'cc-hunt-findings': 'Hunt findings'}
+
+
 def catalog(es) -> list[dict]:
     now = datetime.now(timezone.utc).isoformat()
     rows = []
@@ -55,7 +73,7 @@ def catalog(es) -> list[dict]:
         days = None
         if first and last:
             days = max(1, round((datetime.fromisoformat(last.replace("Z", "+00:00")) - datetime.fromisoformat(first.replace("Z", "+00:00"))).total_seconds() / 86400))
-        rows.append({"source": src, "tier": tier, "tier_order": TIER_ORDER[tier], "what": what, "ask_with": f"FROM {src}",
+        rows.append({"source": src, "label": LABELS[src], "tier": tier, "tier_order": TIER_ORDER[tier], "what": what, "ask_with": f"FROM {src}",
                      "rows": n, "first_seen": first, "last_seen": last, "days": days, "measured_at": now})
         print(f"  {src:36} {n:>12,} rows", flush=True)
     return rows
@@ -67,7 +85,7 @@ def load(es, rows: list[dict]) -> None:
         es.indices.delete(index=index)
     keyword = {"type": "keyword"}
     es.indices.create(index=index, settings={"index.mode": "lookup"}, mappings={"properties": {
-        "measured_at": {"type": "date"}, "source": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword,
+        "measured_at": {"type": "date"}, "source": keyword, "label": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword,
         "ask_with": keyword, "rows": {"type": "long"}, "first_seen": {"type": "date"}, "last_seen": {"type": "date"},
         "days": {"type": "integer"}}})
     helpers.bulk(es, ({"_index": index, "_source": r} for r in rows), refresh="wait_for")

@@ -24,7 +24,8 @@ from .elastic import client
 from .fleet import INTEGRATION_NAME, POLICY_NAME
 from .prep import STREAMS
 
-OLD_DASHBOARDS = ["coldchain-act1-estate", "coldchain-act4-evidence"]
+OLD_DASHBOARDS = ["coldchain-act1-estate", "coldchain-act4-evidence", "coldchain-act5a-history", "coldchain-act5b-history-frozen",
+                  "coldchain-epilogue-edge"]
 RULES = ["coldchain-limits", "coldchain-warm-no-defrost", "coldchain-first-seen-peer"]
 STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-pos.terminal-*", "logs-network_traffic.tls-*"]
 TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-pos.terminal", "logs-network_traffic.tls")

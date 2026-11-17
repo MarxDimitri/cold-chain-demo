@@ -22,8 +22,3 @@ output "collector_credentials" {
   value     = { access_key_id = aws_iam_access_key.collector.id, secret_access_key = aws_iam_access_key.collector.secret }
   sensitive = true
 }
-
-output "federation_credentials" {
-  value     = { access_key_id = aws_iam_access_key.federation.id, secret_access_key = aws_iam_access_key.federation.secret }
-  sensitive = true
-}

@@ -4,7 +4,7 @@
     python -m coldchain.infra empty-bucket --yes   # delete every version and delete marker (governance bypass)
     python -m coldchain.infra clean-raw --since 2026-11-16T08:50:00Z [--delete] [--force]
         # list (default) or delete the raw/ object versions written since a time: the files of a replay run
-    python -m coldchain.infra check          # acceptance checks: store isolation, object lock, collector, federation
+    python -m coldchain.infra check          # acceptance checks: store isolation, object lock, collector
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def write_env() -> None:
               "COLDCHAIN_DETECT_QUEUE_URL": o["detect_queue_url"],
               "COLDCHAIN_DETECT_DLQ_URL": o["detect_dlq_url"]})
     SECRETS.mkdir(mode=0o700, exist_ok=True)
-    for name in ("collector", "federation"):
+    for name in ("collector",):
         path = SECRETS / f"{name}.json"
         path.write_text(json.dumps(o[f"{name}_credentials"]))
         path.chmod(0o600)
@@ -193,12 +193,6 @@ def check() -> None:
             print("note: the collector consumed the message first; the detect/ notification to the queue is configured")
     expect("S3 event for the detect/ object reached the queue (or is configured and consumed by the collector)", saw)
     expect("no queue event for raw/", not any(own_raw in b for b in got))
-
-    fed = json.loads((SECRETS / "federation.json").read_text())
-    f3 = client("s3", fed)
-    expect("federation can read raw/", allowed(lambda: f3.get_object(Bucket=bucket, Key=own_raw)))
-    expect("federation can list raw/", allowed(lambda: f3.list_objects_v2(Bucket=bucket, Prefix="raw/", MaxKeys=1)))
-    expect("federation cannot read detect/", denied(lambda: f3.get_object(Bucket=bucket, Key=own)))
 
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")

@@ -497,3 +497,27 @@ at 12:35 UTC was most likely the same bug. The Act 1 header is now the dashboard
 - **Order now:** CC Act 4 is the hunting agent ("something is going on, and nobody asked": among its findings a TV box talks to a store's system manager, a path no rule watches), CC Act 5 is the epilogue ("let's see what the TV boxes are doing": the raw TLS evidence, the 4.6 GB over nine nights, the signage and plug metrics). Titles, the navigation strip (ACTS order), the dashboards' intro texts, README, story flow and the stage script follow. Dashboard ids did not change.
 - **Why it works:** breadth first, depth second. The agent is the detective that surfaces an unknown unknown; the epilogue is the proof behind one lead, with the evidence read in place from S3. The epilogue's time-travel (the data is dated three weeks before the blip) is introduced as "what happened before", not as a flashback in the middle of a hunt.
 - **Caveat:** the agent already tells most of the story (TV box downloads, pivot), so Act 5 must show what the agent cannot: the per-night bytes against 19 peers, the JA3 fingerprint, the signage and plug evidence. The agent's finding must stay short and point at the lead.
+
+## Simplified version on Serverless (2026-11-17, branch `simplified-serverless`)
+
+- **Decisions:** Serverless Security project (custom panels, Preview, Serverless only); no federation; no frozen tier ("frozen"
+  was the user's word for the storage idea: Serverless stores data in object storage with a cache layer and sizes search
+  capacity itself, so a year of audit is simply indexed); no ES|QL explanations on dashboards; 15 minutes; POS instead of TV boxes.
+  The full version is the tag `v1-ech-federation-tv`.
+- **Spike (Serverless 9.7.0, europe-west3):** custom panels are a Dashboards API panel type, `custom_content`, with `title`,
+  `template` and `esql_query` (an array of one ES|QL string); templates see `rows` and `row["column"].value`. Fleet, data streams
+  with `data_retention`, reroute pipelines, lookup indices with `LOOKUP JOIN`, ML jobs, ES|QL rules, Agent Builder tools and
+  workflows all work. `aws_logs` integration 2.1.1 replaces the pinned 1.8.3 (the policy was created without error).
+- **POS scenario:** per store 4 lanes (`pos-lane`, 10.n.0.31-34) and one back-office PC (`pos-backoffice`, 10.n.0.41); no signage
+  players, no TV box, no smart plug. S07's back-office PC downloads 4.0 GiB in 96 chunks of 20 to 60 MB over 7 nights from
+  `sync.example-cdn.net` (not in `kb-device-profiles`, an unusual JA3), runs at 88% CPU on those nights while the store is closed, fills
+  its disk (64% to 22% free), calls the cameras from 2026-11-07 and the system manager (tcp/80) from 2026-11-09, and at T0 changes S07's
+  setpoints from inside. The store network is flat: an assumption of the fictional chain, to be said as such. The offline-window
+  story and the smart plug are dropped.
+- **Data model:** everything goes through `detect/` and the collector; there is no `raw/` side. Backfill: a year of audit (one file per
+  store and day), 7 days of telemetry, probes and flow summaries; the audit stream keeps 400 days, the others 90. The pre-roll
+  default is 6 hours (a 24 hour pre-roll took 15 minutes). The agent's history, footprint and device-evidence tools query the
+  indexed streams. The cabinet ML jobs and the experiment modules (`ml`, `mlexp`, `mlscore`, `mlcount`, `ruleprobe*`) are removed;
+  the three POS ML jobs remain (`edge-inbound-population`, `edge-pos-cpu`, `edge-pos-disk`).
+- **Not run in AWS (blocked, needs the operator):** `terraform apply` of the federation IAM user removal and emptying the old bucket
+  objects. The new backfill overwrites the keys it needs; old objects without events are never indexed.

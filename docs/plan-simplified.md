@@ -67,3 +67,13 @@ The live replay must be started before the presentation so that T0 lands at abou
 ## Needed from the user
 
 A Serverless **Security** project: its Elasticsearch URL, Kibana URL and an API key with full privileges (kept in `.env`, never in the repository).
+
+## Status (2026-11-17)
+
+Built on this branch: the Serverless environment mapping (`coldchain/envfile.py`), federation and frozen tier removed, the POS
+scenario (chain, generator, knowledge base, ML jobs, agent tools), history indexed (a year of audit, a week of telemetry), the
+Fleet collector enrolled on the Serverless project, the Elasticsearch setup, rules, agent, hunt workflow and six dashboards with
+custom panels created through the APIs, README and story flow. Backfill running at the time of writing.
+Not verified: how the custom panels render (the user has to look), a full 15-minute timed run.
+Not done: the Terraform removal of the federation IAM user (a change was made in `infra/main.tf` but not applied: the apply was
+blocked and needs the operator's go-ahead), emptying the old objects from the bucket.

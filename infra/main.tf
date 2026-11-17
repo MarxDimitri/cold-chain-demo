@@ -217,34 +217,6 @@ resource "aws_iam_access_key" "collector" {
   user = aws_iam_user.collector.name
 }
 
-# Federation data source: reads raw/* only. A federated-identity role replaces this once
-# Elastic's trust details for the deployment are confirmed (see docs/decisions.md).
-resource "aws_iam_user" "federation" {
-  name = "${var.bucket_prefix}-federation"
-}
-
-resource "aws_iam_user_policy" "federation" {
-  name = "read-raw"
-  user = aws_iam_user.federation.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${local.bucket_arn}/raw/*" },
-      {
-        Effect    = "Allow"
-        Action    = ["s3:ListBucket"]
-        Resource  = local.bucket_arn
-        Condition = { StringLike = { "s3:prefix" = ["raw/*", "raw"] } }
-      },
-      { Effect = "Allow", Action = ["s3:GetBucketLocation"], Resource = local.bucket_arn },
-    ]
-  })
-}
-
-resource "aws_iam_access_key" "federation" {
-  user = aws_iam_user.federation.name
-}
-
 # ---------------------------------------------------------------- credentials for the generator
 
 resource "local_sensitive_file" "store_keys" {
