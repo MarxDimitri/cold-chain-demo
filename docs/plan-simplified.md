@@ -47,9 +47,19 @@ The live replay must be started before the presentation so that T0 lands at abou
 5. **Dashboards:** rebuilt for six short acts with custom panels. Gate: queries return rows; the user checks the rendering.
 6. **15-minute rehearsal** and documentation. Gate: a timed run.
 
+## Spike results (2026-11-17, Serverless Security project, Elasticsearch 9.7.0, europe-west3)
+
+- **Custom panels work through the Dashboards API.** The panel type is `custom_content`, config `{"title": "...", "template": "<html, css, liquid>", "esql_query": ["<one ES|QL string>"]}` (the API keeps `template`, `title` and `esql_query`, an array of strings, and drops other keys). Template variables (from the docs): `rows` (loop with `{% for row in rows %}`), `row["column"].value` and `.pct`, `max["column"]`, the `round` filter, `{% if rows.size == 0 %}`, CSS variables `--cc-*`. Inline SVG is allowed. Not verified: how it renders (no way to see it from the API).
+- **Fleet:** a managed Fleet server is there (europe-west3); the `aws_logs` package is available (2.1.1, not installed yet; the Hosted build pinned 1.8.3).
+- **Elasticsearch:** component and index templates, data streams with `data_retention`, a `reroute` ingest pipeline, a lookup index with `LOOKUP JOIN`, `INLINE STATS`, `DATE_DIFF`, bulk indexing: all work.
+- **ML, rules, agent, workflows:** an anomaly detection job, an ES|QL detection rule (created disabled), an Agent Builder tool, the workflows list and LLM connectors (Anthropic Claude Haiku, Opus, Sonnet) all work.
+- **Not available:** `_cluster/health` and other node-level APIs (not needed).
+- **Not yet tested:** the collector enrolling and reading the SQS queue (next, in setup), a workflow with the `ai.agent` step, and whether AlertZero's setting exists.
+- **The API key** has no roles listed but worked for everything above.
+
 ## Risks
 
-- **Custom panels may not be creatable through the Dashboards API** (the page mentions only the UI and the Agent Builder chat). If not, panels are authored once in the UI and exported, or the dashboards are no longer pure code.
+- ~~Custom panels may not be creatable through the Dashboards API~~ Resolved by the spike: they are (`custom_content`). Rendering is still unverified until the user looks.
 - **Serverless limits** (settings on data streams, no snapshot APIs, feature differences) may force changes to templates, pipelines and ML.
 - **The frozen-tier message** changes; the speed-versus-spend knob (Search Power) exists only on Elasticsearch projects, not Security ones.
 - **The 15 minutes** are tight with a live attack; the replay has to start early.
