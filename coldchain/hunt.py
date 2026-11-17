@@ -31,7 +31,7 @@ distinct finding once. Every claim must come from a tool result; do not guess an
 
 Check at least these, with your tools:
 1. Access from outside: logins or setpoint changes from addresses that are neither a store LAN nor a contractor range, in the
-   indexed data and in the year of raw history (a first visit is a finding even when nothing changed).
+   indexed data, which includes a year of history (a first visit is a finding even when nothing changed).
 2. Temperature: cabinets warm for too long with no defrost.
 3. Device behaviour: devices talking to servers their profile does not allow, internal peers never seen before, unusual
    volume (compare with what is normal for that device role).
@@ -40,7 +40,7 @@ Check at least these, with your tools:
 Report one finding per type and store, never two for the same thing (a first visit seen both live and in the history is one
 finding, with the earliest time). The key is exactly `<type>:<store>` with the type from this list and the store id (for a
 group of stores use their ids joined with `+`, in order): first-visit, setpoint-change, forced-defrost, warm-cabinets,
-tv-box-download, internal-pivot, exposed-controllers. Examples: `first-visit:S07`, `setpoint-change:S11`,
+pos-download, internal-pivot, exposed-controllers. Examples: `first-visit:S07`, `setpoint-change:S11`,
 `exposed-controllers:S03+S05+S09+S12+S14`. The same finding must get the same key on every run.
 List in `tools` the ids of the tools whose results support each finding (for example `cc_history_of_address`).
 Keep the text short, it is shown in a dashboard table: title at most 70 characters, proposed_action at most 120,

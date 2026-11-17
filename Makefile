@@ -2,7 +2,7 @@ PY := .venv/bin/python
 OUT ?= out
 STORES ?=
 
-.PHONY: history-frozen rules dashboards dashboards-check setup-elastic collector-up collector-down collector-logs install lookups backfill-local replay replay-fast demo rehearse restore agent agent-check clean-run reset plan-aws setup-aws verify-infra teardown-aws test clean
+.PHONY: rules dashboards dashboards-check setup-elastic collector-up collector-down collector-logs install lookups backfill-local replay replay-fast demo rehearse restore agent agent-check clean-run reset plan-aws setup-aws verify-infra teardown-aws test clean
 
 install:
 	python3 -m venv .venv
@@ -103,10 +103,6 @@ dashboards-check:
 rules:
 	$(PY) -m coldchain.rules push $(if $(ENABLE),--enable)
 
-# Act 5b: index the raw audit history, snapshot it and mount it on the frozen tier (needs a frozen node and AWS credentials).
-history-frozen:
-	set -a; . ./.env; set +a; $(PY) -m coldchain.frozen load && $(PY) -m coldchain.frozen check
-
 # The agentic SOC (Agent Builder, preview): create the tools and the agent, test the tool queries, ask the scripted question.
 agent:
 	$(PY) -m coldchain.agent push
@@ -134,7 +130,7 @@ hunt-run:
 # ======================================================================================================================
 # Runbook targets: see README.md for the order, the prerequisites and what each step needs.
 # ======================================================================================================================
-.PHONY: help setup backfill backfill-epilogue federation federation-check epilogue baselines sources correlation content verify teardown teardown-elastic \
+.PHONY: help setup backfill backfill-epilogue epilogue baselines sources content verify teardown teardown-elastic \
         clean-raw hunt-clear reset-demo
 
 help:
@@ -144,7 +140,6 @@ help:
 	@echo "  make backfill                12 months raw + 35 days indexed history to S3 (long, restartable)"
 	@echo "  make backfill-epilogue       scenario B (the TV box) to S3"
 	@echo "  make baselines epilogue      knowledge base baselines, epilogue ML and rule"
-	@echo "  make history-frozen          Act 3b (needs a frozen node on the deployment)"
 	@echo "  make sources content         the source catalog (Act 0), then dashboards, rules, agent, hunt"
 	@echo "  make verify                  infrastructure, pipeline, federation, dashboards, agent checks"
 	@echo "A demo:        make demo (live, 1x) | make rehearse (hands-off) | make restore (in a second terminal)"
@@ -152,7 +147,7 @@ help:
 	@echo "Tear down:     make teardown   (the Elastic Cloud deployment itself is yours to delete)"
 
 # AWS (Terraform), then the Elastic side, then the collector, then the federation data source. Needs .env filled in (README step 3).
-setup: setup-aws verify-infra setup-elastic collector-up federation
+setup: setup-aws verify-infra setup-elastic collector-up
 
 # The history: raw/ (12 months of audit, 7 days of flows) and detect/ (35 days indexed). Tens of thousands of PUTs; safe to re-run.
 backfill:
@@ -163,26 +158,13 @@ backfill-epilogue:
 	# and S07's netflow.log), and --resume would skip them, leaving the epilogue streams about a third short.
 	set -a; . ./.env; set +a; $(PY) -m coldchain.scenario_b --target s3
 
-# The data source and datasets only: a check needs files under raw/, so it is `make federation-check` after the backfill.
-federation:
-	$(PY) -m coldchain.federation setup
-
-federation-check:
-	$(PY) -m coldchain.federation check
-
 # After the detect/ history is indexed (the collector drains the queue): what is normal for the Act 2 tiles.
 baselines:
 	$(PY) -m coldchain.baselines
 
 # Act 0 and the "one question, three places" panel: measures every source (the raw files are counted in place, about 5 minutes)
-# and the same question against the live index, the frozen tier and the raw files. Run after history-frozen and both backfills.
 sources:
 	$(PY) -m coldchain.sources
-
-# The cross-source correlation example of Act 0 (live index + raw files + knowledge base in one statement, about 75 s). Re-run it
-# after the attack to see today's visits next to the history. `make sources` includes it.
-correlation:
-	$(PY) -m coldchain.sources correlation
 
 # Scenario B: ML jobs and datafeeds over the epilogue window, and the new-terms rule (created disabled).
 epilogue:
@@ -195,7 +177,6 @@ content: dashboards rules agent hunt
 
 verify: verify-infra
 	$(PY) -m coldchain.elastic check
-	$(PY) -m coldchain.federation check
 	$(PY) -m coldchain.dashboards check
 	$(PY) -m coldchain.agent check
 
@@ -209,14 +190,13 @@ hunt-clear:
 
 # Everything a run leaves behind: indexed data, alerts, hunt findings, and (listed, deleted with DELETE=1) the raw files.
 # SINCE is the replay's start (T0 minus 3 minutes; the run prints it): after the pre-roll, so the day of context stays.
-# With DELETE=1 the frozen copy of the history is rebuilt afterwards and the Act 0 correlation is measured again (history only).
+# With DELETE=1 the frozen copy of the history is rebuilt afterwards and the Act 0 is measured again (history only).
 reset-demo:
 	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"; exit 1)
 	$(MAKE) clean-run SINCE=$(SINCE)
 	$(MAKE) hunt-clear
 	$(MAKE) clean-raw SINCE=$(SINCE) $(if $(DELETE),DELETE=1)
-	$(if $(DELETE),$(MAKE) history-frozen)
-	$(if $(DELETE),$(MAKE) correlation)
+	$(if $(DELETE),$(MAKE))
 
 # Removes what the repo created: the hunt, the frozen copy, the collector and the AWS stack (bucket versions included).
 # The Elastic Cloud deployment is not touched: delete it in the Elastic Cloud console.

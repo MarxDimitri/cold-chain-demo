@@ -17,9 +17,12 @@ from pathlib import Path
 
 from elasticsearch import Elasticsearch, NotFoundError, helpers
 
+from .envfile import load_env
+
 ROOT = Path(__file__).resolve().parent.parent
 ECS_VERSION = "9.4.0"  # assumption: confirm against https://github.com/elastic/ecs/releases
-RETENTION = "40d"  # indexed history is 35 days; the long history lives in the bucket
+RETENTION = "90d"
+RETENTION_BY_DATASET = {"coldchain.audit": "400d"}  # the year of store audit is indexed too
 PIPELINE = "coldchain-route"
 
 # The collector's API key (Fleet, Custom AWS Logs integration) can only write logs-*-*, and Fleet blocks
@@ -34,18 +37,14 @@ DATASETS = {
     "coldchain.case": ("logs", ["info"]),
     "coldchain.probe": ("logs", ["info"]),  # independent temperature loggers, outside the controller's trust
     "netflow.summary": ("logs", ["connection", "info"]),
-    "signage.cms": ("logs", ["info"]),   # scenario B: hourly roll-ups of the signage players (CPU, storage)
-    "power.plug": ("logs", ["info"]),    # scenario B: hourly roll-ups of the smart plugs (watts)
+    "pos.terminal": ("logs", ["info"]),  # POS scenario: hourly roll-ups per POS terminal (CPU, disk, transactions per minute)
+    "network_traffic.tls": ("logs", ["connection", "info"]),  # POS scenario: TLS sessions of the S07 back-office POS
 }
 
 
 def client() -> Elasticsearch:
-    for line in (ROOT / ".env").read_text().splitlines():
-        if "=" in line and not line.startswith("#"):
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k, v)
-    return Elasticsearch(os.environ["ELASTICSEARCH_URL"], api_key=os.environ["ELASTIC_API_KEY"],
-                         request_timeout=300)
+    env = load_env()
+    return Elasticsearch(env["ELASTICSEARCH_URL"], api_key=env["ELASTIC_API_KEY"], request_timeout=300)
 
 
 def kw(**extra):
@@ -81,10 +80,9 @@ CUSTOM_MAPPINGS = {
             }},
             "netflow": {"properties": {"flows": {"type": "long"}}},
             "probe": {"properties": {"temperature": {"type": "float"}}},
-            "edge": {"properties": {
-                "attached_to": kw(),
-                "storage": {"properties": {"free_pct": {"type": "float"}}},
-                "power": {"properties": {"watts": {"type": "float"}}},
+            "pos": {"properties": {
+                "disk_free_pct": {"type": "float"},
+                "tx_per_min": {"type": "float"},
             }},
             "independent": {"type": "boolean"},
         }},
@@ -119,7 +117,7 @@ def pipeline_body() -> dict:
     procs += [
         {"set": {"field": "data_stream.type", "value": "logs",
                  "if": "ctx.data_stream?.type == null || ctx.event?.dataset == null"}},
-        # labels.namespace routes the scenario B epilogue into its own streams (…-epilogue); default otherwise.
+        # labels.namespace routes the POS scenario into its own streams (…-pos); default otherwise.
         {"reroute": {"dataset": "{{event.dataset}}", "namespace": ["{{labels.namespace}}", "default"],
                      "if": "ctx.event?.dataset != null"}},
     ]
@@ -127,9 +125,9 @@ def pipeline_body() -> dict:
             "meta": {"managed_by": "coldchain.elastic"}}
 
 
-def index_template(pattern: str, stream_type: str) -> dict:
+def index_template(pattern: str, stream_type: str, retention: str = RETENTION) -> dict:
     return {
-        "template": {"lifecycle": {"data_retention": RETENTION}},
+        "template": {"lifecycle": {"data_retention": retention}},
         "index_patterns": [pattern],
         "data_stream": {},
         "priority": 250,  # above the built-in logs-*-* / metrics-*-* templates (100)
@@ -152,7 +150,7 @@ def setup(es: Elasticsearch) -> None:
         pass
     for dataset, (stream_type, _) in DATASETS.items():
         es.indices.put_index_template(name=f"{stream_type}-{dataset}", **index_template(
-            f"{stream_type}-{dataset}-*", stream_type))
+            f"{stream_type}-{dataset}-*", stream_type, RETENTION_BY_DATASET.get(dataset, RETENTION)))
         print(f"index template {stream_type}-{dataset}-*")
         if dataset in ALIASES:  # templates cannot carry data stream aliases: create the stream, then alias it
             stream = f"{stream_type}-{dataset}-default"

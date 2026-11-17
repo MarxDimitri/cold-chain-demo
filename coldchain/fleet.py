@@ -16,6 +16,8 @@ from pathlib import Path
 
 import requests
 
+from .envfile import load_env
+
 ROOT = Path(__file__).resolve().parent.parent
 SECRETS = ROOT / ".secrets"
 POLICY_NAME = "cold-chain-collector"
@@ -23,14 +25,6 @@ INTEGRATION_NAME = "cold-chain-detect-s3"
 PACKAGE, PACKAGE_VERSION = "aws_logs", "1.8.3"
 INGEST_DATASET = "coldchain.ingest"
 PIPELINE = "coldchain-route"
-
-
-def load_env() -> dict[str, str]:
-    for line in (ROOT / ".env").read_text().splitlines():
-        if "=" in line and not line.startswith("#"):
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k, v)
-    return os.environ  # type: ignore[return-value]
 
 
 class Kibana:

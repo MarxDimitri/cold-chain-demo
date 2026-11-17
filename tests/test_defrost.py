@@ -32,7 +32,7 @@ def chain():
 def two_days(tmp_path_factory, chain):
     root = tmp_path_factory.mktemp("defrost")
     backfill.main(["--target", "local", "--out", str(root), "--stores", "S07", "--detect-days", "2",
-                   "--flow-days", "1", "--raw-days", "3", "--only", "telemetry,audit"])
+                   "--audit-days", "3", "--only", "telemetry,audit"])
     return root
 
 

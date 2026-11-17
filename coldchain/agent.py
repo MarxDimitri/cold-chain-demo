@@ -5,9 +5,9 @@
     python -m coldchain.agent ask [QUESTION]   # ask the agent (needs an LLM connector on the deployment)
     python -m coldchain.agent delete
 
-Eight ES|QL tools, one per step of the hunt. They read the indexed streams (the blip), the knowledge base (what is normal)
-and the federated raw datasets (a year of history and the TV box evidence, experimental). The agent proposes containment;
-it does not change anything. Agent Builder is a preview feature: say so on stage.
+Nine ES|QL tools, one per step of the hunt. They read the indexed streams (the blip, a year of audit history, the POS evidence)
+and the knowledge base (what is normal). The agent proposes containment; it does not change anything. Agent Builder is a
+preview feature: say so on stage.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ TOOLS = [
     {"id": "cc_recent_outside_logins",
      "description": "Indexed audit, live: successful logins in the last N minutes from addresses that are neither the contractor range "
                     "nor a store LAN, per store with the source address. Shows which stores' system managers an outsider has just "
-                    "logged in to, before the raw history is available.",
+                    "logged in to.",
      "params": {"minutes": {"type": "integer", "description": "look back this many minutes"}},
      "query": """FROM logs-coldchain.audit-default
 | WHERE event.action == "logged-in" AND DATE_DIFF("minutes", @timestamp, NOW()) <= ?minutes
@@ -62,23 +62,22 @@ TOOLS = [
 | STATS warm_cabinets = COUNT(*), largest_rise_k = ROUND(MAX(peak), 1) BY retail.store.id
 | SORT warm_cabinets DESC"""},
     {"id": "cc_history_of_address",
-     "description": "FEDERATION (experimental): a year of raw store audit read in place from S3, never ingested. Every successful login "
-                    "from one address, per store, with first and last time. Use it to find when an attacker first visited each store.",
+     "description": "A year of indexed store audit: every successful login from one address, per store, with first and last time. "
+                    "Use it to find when an attacker first visited each store.",
      "params": {"ip": {"type": "string", "description": "source address, for example 203.0.113.47"}},
-     "query": """FROM raw_store_audit
+     "query": """FROM logs-coldchain.audit-default
 | WHERE event.action == "logged-in"
-| EVAL ip = TO_STRING(source.ip), store = TO_STRING(retail.store.id)
+| EVAL ip = TO_STRING(source.ip)
 | WHERE ip == ?ip
-| STATS visits = COUNT(*), first_visit = MIN(@timestamp), last_visit = MAX(@timestamp) BY store
+| STATS visits = COUNT(*), first_visit = MIN(@timestamp), last_visit = MAX(@timestamp) BY store = retail.store.id
 | SORT first_visit"""},
     {"id": "cc_estate_footprint",
-     "description": "FEDERATION (experimental): raw network flows in S3 that touch the attacker address range, per store: which stores "
-                    "the attacker has reached or called back to.",
+     "description": "Indexed network flow summaries that touch the attacker address range, per store: which stores the attacker "
+                    "has reached or called back to.",
      "params": {},
-     "query": f"""FROM raw_store_flows
-| EVAL src = TO_STRING(source.ip), dst = TO_STRING(destination.ip), store = TO_STRING(retail.store.id)
-| WHERE CIDR_MATCH(TO_IP(src), "{ATTACKER}") OR CIDR_MATCH(TO_IP(dst), "{ATTACKER}")
-| STATS flows = COUNT(*), first_seen = MIN(@timestamp), last_seen = MAX(@timestamp) BY store
+     "query": f"""FROM logs-netflow.summary-default
+| WHERE CIDR_MATCH(source.ip, "{ATTACKER}") OR CIDR_MATCH(destination.ip, "{ATTACKER}")
+| STATS flows = COUNT(*), first_seen = MIN(@timestamp), last_seen = MAX(@timestamp) BY store = retail.store.id
 | SORT first_seen"""},
     {"id": "cc_exposed_controllers",
      "description": "Knowledge base: system managers that face the internet, with firmware, owner and the contractor's vendor-cloud "
@@ -89,10 +88,10 @@ TOOLS = [
 | KEEP retail.store.id, retail.owner.id, coldchain.controller.firmware, contractor.account.id
 | SORT retail.store.id"""},
     {"id": "cc_device_evidence",
-     "description": "FEDERATION (experimental): raw TLS records in S3 for one store, devices talking to servers their device profile does "
-                    "not allow: server name, gigabytes received, chunks, nights and the TLS fingerprint (JA3). Hypothetical scenario.",
+     "description": "TLS records for one store: devices talking to servers their device profile does not allow, with the server name, "
+                    "gigabytes received, chunks, nights and the TLS fingerprint (JA3). Hypothetical POS scenario.",
      "params": {"store": {"type": "string", "description": "store id, for example S07"}},
-     "query": """FROM raw_store_tls
+     "query": """FROM logs-network_traffic.tls-pos
 | EVAL store = TO_STRING(retail.store.id), host.ip = TO_STRING(source.ip), tls.client.server_name = TO_STRING(tls.client.server_name)
 | WHERE store == ?store
 | LOOKUP JOIN kb-assets-by-ip ON host.ip
@@ -105,11 +104,11 @@ TOOLS = [
 | KEEP host.name, tls.client.server_name, received_gb, chunks, nights, first_seen, last_seen, ja3
 | LIMIT 10"""},
     {"id": "cc_internal_movement",
-     "description": "Indexed flow summaries (hypothetical epilogue namespace): first-seen flows between devices inside one store, "
-                    "newest first. Shows how a compromised device moved sideways, for example a TV box reaching the system manager.",
+     "description": "Indexed flow summaries (hypothetical POS scenario): first-seen flows between devices inside one store, "
+                    "newest first. Shows how a compromised device moved sideways, for example a back-office POS reaching the system manager.",
      "params": {"store": {"type": "string", "description": "store id, for example S07"}},
-     "query": """FROM logs-netflow.summary-epilogue
-| WHERE retail.store.id == ?store AND CIDR_MATCH(source.ip, "10.7.0.0/16") AND CIDR_MATCH(destination.ip, "10.7.0.0/16")
+     "query": """FROM logs-netflow.summary-pos
+| WHERE retail.store.id == ?store AND CIDR_MATCH(source.ip, "10.0.0.0/8") AND CIDR_MATCH(destination.ip, "10.0.0.0/8")
 | STATS first_seen = MIN(@timestamp), flows = COUNT(*) BY host.name, source.ip, destination.ip, destination.port
 | SORT first_seen DESC
 | LIMIT 10"""},
@@ -123,23 +122,23 @@ TOOLS = [
 
 AGENT_ID = "cc-soc-hunter"
 INSTRUCTIONS = """You are the SOC agent of a fictional retail chain (20 stores on the Upper Rhine, synthetic data). You hunt across
-the live detections, a year of raw history and the in-store network, and you answer in ONE narrative, in this order:
+the live detections, a year of audit history and the in-store network, and you answer in ONE narrative, in this order:
 
 1. THE BLIP. Call cc_recent_changes (for example 60 minutes), cc_recent_outside_logins and cc_warm_cabinets. Say which stores, how many cabinets, who changed
    them, from where, and what the knowledge base says is normal. Notice the two kinds of source address: the internet address and
    an address inside the store.
 2. THE HISTORY. Call cc_history_of_address with the internet address, and cc_estate_footprint. Say when the attacker first visited
-   each store (months ago, before any alert could exist) and that the raw history was read in place from S3, never ingested.
+   each store (months ago, before any alert could exist), from a year of history that nobody was looking at.
 3. THE STORE. For the store whose change came from inside, call cc_internal_movement and cc_device_evidence. Say which device
-   it was, what it downloaded and from which server, over how many nights, and how it reached the system manager.
+   it was (a back-office POS PC), what it downloaded and from which server, over how many nights, and how it reached the system
+   manager. A POS device reaching the refrigeration controller means nothing separates the two on that store network: say so.
 4. WHAT IS NEXT. Call cc_exposed_controllers and subtract the stores already touched: every store with an outside login
    (cc_recent_outside_logins, live) or in cc_history_of_address or cc_estate_footprint (history, may lag a running attack). Name the stores still at risk and the
    shared contractor account. Propose containment (block the address, isolate the device, review the account, restore setpoints
    after the contractor approves). You never run containment yourself.
 
 Rules: use the tools, never guess numbers or causes (do not name how the attacker got the credentials or what a device
-"beacons"; say what the data shows and what is not known); show times in UTC; say "experimental" whenever you use a federation tool and
-"hypothetical, synthetic" for the TV box scenario; quote counts per store exactly as the tools return them; keep the answer short, one section per step, ending with a one-line verdict. Write the final answer directly: never
+"beacons"; say what the data shows and what is not known); show times in UTC; say "hypothetical, synthetic" for the POS scenario; quote counts per store exactly as the tools return them; keep the answer short, one section per step, ending with a one-line verdict. Write the final answer directly: never
 announce that you are about to answer and never describe your plan."""
 
 DEFAULT_QUESTION = ("Something changed temperature setpoints in our stores. What happened, how long has the attacker been in, "
@@ -155,7 +154,7 @@ def tool_body(t: dict) -> dict:
 
 def agent_body() -> dict:
     return {"id": AGENT_ID, "name": "Cold-chain SOC agent (preview)",
-            "description": "Hunts across detections, a year of raw history and the in-store network and tells one story. Synthetic data.",
+            "description": "Hunts across detections, a year of history and the in-store network and tells one story. Synthetic data.",
             "configuration": {"instructions": INSTRUCTIONS, "tools": [{"tool_ids": [t["id"] for t in TOOLS]}]}}
 
 

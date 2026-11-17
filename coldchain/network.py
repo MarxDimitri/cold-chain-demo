@@ -16,9 +16,12 @@ from .chain import Chain, Store, devices
 PAIRS = [
     ("system-manager", "store-server", 8443, "tcp", 4_000, 1_500, False),
     ("store-server", "192.0.2.10", 443, "tcp", 60_000, 20_000, False),   # vendor cloud
-    ("signage-player", "192.0.2.20", 443, "tcp", 5_000, 400_000, True),  # signage CDN
-    ("tv-box", "192.0.2.30", 443, "tcp", 3_000, 15_000, True),           # TV box update server (about 35 MB a week)
-    ("tv-box", "192.0.2.31", 123, "udp", 90, 90, False),                 # NTP
+    ("pos-lane", "store-server", 8443, "tcp", 6_000, 3_000, True),       # transactions to the store server
+    ("pos-lane", "192.0.2.40", 443, "tcp", 4_000, 6_000, True),          # payment gateway
+    ("pos-lane", "192.0.2.31", 123, "udp", 90, 90, False),               # NTP
+    ("pos-backoffice", "store-server", 8443, "tcp", 10_000, 5_000, True),  # prices, reports
+    ("pos-backoffice", "192.0.2.30", 443, "tcp", 3_000, 15_000, True),   # POS vendor update server (about 35 MB a week)
+    ("pos-backoffice", "192.0.2.31", 123, "udp", 90, 90, False),         # NTP
     ("store-server", "camera", 554, "tcp", 2_000, 900_000, False),       # recording
 ]
 WINDOW = 300

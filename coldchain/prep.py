@@ -5,7 +5,7 @@
 
 The replay writes its own normal telemetry for every store, so any baseline documents in the indexed detect streams from
 5 minutes ago to MINUTES ahead (default 60) would double every cabinet minute: they are deleted before the replay starts.
-Then the pre-roll (default 24 hours, 0 = off) fills the gap between the end of the indexed baseline and now with normal data
+Then the pre-roll (default 6 hours, 0 = off) fills the gap between the end of the indexed baseline and now with normal data
 written to S3 and read by the collector, so the dashboards and rule 2 start with a day of context.
 """
 from __future__ import annotations
@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> None:
     args = list(argv if argv is not None else sys.argv[1:])
     if args[:1] == ["clean"]:
         return clean(args[1])
-    hours = 24.0
+    hours = 6.0
     if "--preroll-hours" in args:
         i = args.index("--preroll-hours")
         hours = float(args[i + 1])

@@ -53,12 +53,6 @@ def test_restore_events_follow(out):
     assert min(r["@timestamp"] for r in rs) >= "2026-11-12T03:02:00Z"  # T0 + 10 min
 
 
-def test_audit_also_lands_in_raw(out):
-    n_raw = sum(1 for r in read(out, "raw/dataset=coldchain.audit/**/*.ndjson.gz")
-                if r["event"]["action"] == "parameter-change")
-    assert n_raw == 92  # 46 attack changes + 46 restores
-
-
 def test_warming_stays_within_3_5_k_and_recovers(out):
     chain = load_chain()
     sp = {c.id: c.setpoint for s in chain.stores for c in cabinets(chain, s)}
@@ -78,16 +72,6 @@ def test_warming_stays_within_3_5_k_and_recovers(out):
     assert rise > 0.5
     # an unattacked cabinet keeps its setpoint
     assert {c["setpoint"] for _, c in by_cab["S07-C20"]} == {2.0}
-
-
-def test_hunt_finds_nine_stores_in_raw_flows(out, attack):
-    stores = {r["retail"]["store"]["id"] for r in read(out, "raw/dataset=netflow.log/**/*.ndjson.gz")
-              if r["source"]["ip"].startswith("203.0.113.") or r["destination"]["ip"].startswith("203.0.113.")}
-    assert stores == set(attack["touched_stores"])
-    out_flow = [r for r in read(out, "raw/dataset=netflow.log/store=S07/**/*.ndjson.gz")
-                if r["destination"]["ip"] == attack["attacker_ip"]]
-    assert len(out_flow) == 1 and out_flow[0]["source"]["ip"] == "10.7.0.21"
-    assert out_flow[0]["@timestamp"] == "2026-11-12T02:52:11Z"
 
 
 def test_attack_summary_reaches_detect(out, attack):

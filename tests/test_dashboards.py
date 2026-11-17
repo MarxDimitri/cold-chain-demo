@@ -17,13 +17,6 @@ def test_dashboards_are_well_formed():
         assert body["title"] and body["time_range"]["from"] and len(d.panels) < 1000
 
 
-def test_federated_and_hypothetical_panels_are_labelled():
-    epi = dashboards.epilogue()
-    text = " ".join(p["config"].get("content", "") for p in epi.panels if p["type"] == "markdown")
-    assert "Hypothetical" in text and "experimental" in text
-    assert "raw_store_tls" in dashboards.EVIDENCE and "TO_STRING(source.ip)" in dashboards.EVIDENCE  # text columns cast before the join
-
-
 def test_rules_carry_the_store_and_are_esql():
     for rid, r in rules.RULES.items():
         b = rules.body(rid, False)

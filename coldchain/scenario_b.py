@@ -1,16 +1,14 @@
-"""Scenario B (epilogue, hypothetical): a payload on an in-store TV box. Generator.
+"""The POS scenario (hypothetical): the back-office POS PC of one store is compromised. Generator.
 
     python -m coldchain.scenario_b --target local --out out-b [--stores S03,S07]
     python -m coldchain.scenario_b --target s3 [--resume]
 
-What it writes (config/scenario_b.yaml; all records carry labels.namespace = "epilogue"):
-  detect/  netflow.summary   all 20 stores, 5-minute summaries; S07 adds the nightly download and the internal flows
-           signage.cms       hourly roll-ups (CPU, storage) of every signage player
-           power.plug        hourly roll-ups of every TV box's smart plug
-  raw/     netflow.log, network_traffic.tls, signage.cms, power.plug     S07 only, hourly files
+What it writes (config/scenario_b.yaml; all records carry labels.namespace = "pos"), all to detect/:
+  netflow.summary       all 20 stores, 5-minute summaries; S07 adds the nightly download and the internal flows
+  pos.terminal          hourly roll-ups (CPU, free disk, transactions per minute) of every POS terminal
+  network_traffic.tls   S07 only: the TLS sessions of its POS terminals (server names, JA3)
 
-The nightly download is 123 chunks of 20-60 MB from models.example-hub.net over 9 nights, 4.6 GiB in all. One night S07 is
-offline for 48 minutes: its files for that window are uploaded after it is back, with event.ingested set to the upload time.
+The nightly download is 96 chunks of 20-60 MB from sync.example-cdn.net over 7 nights, 4.0 GiB in all.
 """
 from __future__ import annotations
 
@@ -78,11 +76,6 @@ def chunk_plan(seed: int) -> list[tuple[int, int]]:
     return out
 
 
-def offline_span() -> tuple[int, int, int]:
-    o = config()["offline"]
-    return epoch(o["night"], o["from_utc"]), epoch(o["night"], o["to_utc"]), epoch(o["night"], o["upload_utc"])
-
-
 # --- records ----------------------------------------------------------------------------------
 
 def tag(rec: dict) -> dict:
@@ -114,7 +107,7 @@ def store_flows(chain: Chain, store: Store, seed: int):
         by_role.setdefault(d.role, []).append(d)
     router_ip = by_role["router"][0].ip
     rng = np.random.default_rng([seed, 7, 5])
-    tv = by_role["tv-box"][0]
+    bo = by_role["pos-backoffice"][0]
     dl = cfg["download"]
 
     extra_raw: list[tuple[int, dict]] = []
@@ -139,11 +132,11 @@ def store_flows(chain: Chain, store: Store, seed: int):
 
     tls: list[tuple[int, dict]] = []
     for ts, size in chunk_plan(seed):
-        rec = add(ts, tv, dl["server_ip"], 443, int(rng.integers(2_000, 6_000)), size)
+        rec = add(ts, bo, dl["server_ip"], 443, int(rng.integers(2_000, 6_000)), size)
         tls.append((ts, tls_record(rec, dl["server_name"], dl["ja3"])))
 
     for f in cfg["internal_flows"]:
-        name, _, nth = f["src"].partition("-0")  # "signage-player-02" -> role signage-player, second device
+        name, _, nth = f["src"].partition("-0")  # "pos-lane-02" -> role pos-lane, second device
         src = by_role[name][int(nth) - 1 if nth else 0]
         dsts = by_role[f["dst"]]
         dsts = dsts if len(dsts) < 3 else dsts[:1]
@@ -159,72 +152,48 @@ def store_flows(chain: Chain, store: Store, seed: int):
     ja3, names = cfg["ja3_normal"], cfg["server_names"]
     for t, r in raw:
         if r["destination"]["port"] == 443 and r["destination"]["ip"] in names:
-            tls.append((t, tls_record(r, names[r["destination"]["ip"]], ja3.get(r["retail"]["device"]["role"], ja3["tv-box"]))))
+            tls.append((t, tls_record(r, names[r["destination"]["ip"]], ja3.get(r["retail"]["device"]["role"], ja3["pos-lane"]))))
     raw = sorted(raw + extra_raw, key=lambda x: x[0])
     summary = sorted(summary + [(k[0], v) for k, v in sums.items()], key=lambda x: x[0])
     return raw, summary, sorted(tls, key=lambda x: x[0])
 
 
-# --- edge metrics -----------------------------------------------------------------------------
+# --- POS terminal metrics ----------------------------------------------------------------------
 
-def edge_series(store: Store, chain: Chain, seed: int, step: int):
-    """(signage records, plug records) at `step` seconds. S07's SIG-02 and TV box tell the story."""
+def pos_series(store: Store, chain: Chain, seed: int, step: int) -> list[tuple[int, dict]]:
+    """Records at `step` seconds for every POS terminal of the store. S07's back-office PC tells the story."""
     cfg = config()
-    e, (start, end) = cfg["edge"], window()
-    devs = devices(chain, store)
-    sigs = [d for d in devs if d.role == "signage-player"]
-    tv = next(d for d in devs if d.role == "tv-box")
+    p, dl, (start, end) = cfg["pos"], cfg["download"], window()
+    devs = [d for d in devices(chain, store) if d.role in ("pos-lane", "pos-backoffice")]
     story = store.id == cfg["store"]
-    busy_from = epoch(e["signage_busy_from"])
-    first_night = epoch(cfg["download"]["first_night"], cfg["download"]["night_start_utc"])
+    first_night = epoch(dl["first_night"], dl["night_start_utc"])
     ts = np.arange(start, end, step)
-    sig_out, plug_out = [], []
-    for i, d in enumerate(sigs):
+    hour = (ts % DAY) / 3600
+    daylight = np.sin(np.pi * (hour - 6) / 16).clip(0) * ((hour >= 6) & (hour < 22))
+    out: list[tuple[int, dict]] = []
+    for i, d in enumerate(devs):
         rng = np.random.default_rng([seed, 7, store.number, 20 + i])
-        hour = (ts % DAY) / 3600
-        cpu = 0.28 + 0.10 * np.sin(np.pi * (hour - 6) / 16).clip(0) + rng.normal(0, 0.02, len(ts))
-        free = 62 + rng.normal(0, 0.4, len(ts))
-        if story and d.name.endswith("SIG-02"):
-            on = ts >= busy_from
-            cpu = np.where(on, e["signage_cpu_busy"] + rng.normal(0, 0.008, len(ts)), cpu)
-            frac = np.clip((ts - busy_from) / (end - busy_from), 0, 1)
-            free = np.where(on, e["storage_free_start_pct"] + (e["storage_free_end_pct"] - e["storage_free_start_pct"]) * frac
+        lane = d.role == "pos-lane"
+        cpu = (0.07 + 0.12 * daylight if lane else 0.05 + 0.08 * daylight) + rng.normal(0, 0.012, len(ts))
+        free = 64 + rng.normal(0, 0.3, len(ts))
+        tx = np.clip(5.0 * daylight + rng.normal(0, 0.4, len(ts)), 0, None) if lane else np.zeros(len(ts))
+        if story and not lane:
+            k, within = (ts - first_night) // DAY, (ts - first_night) % DAY
+            night = (ts >= first_night) & (k < dl["nights"]) & (within < dl["night_hours"] * 3600)
+            cpu = np.where(night, p["cpu_busy"] + rng.normal(0, 0.02, len(ts)), cpu)
+            frac = np.clip((ts - first_night) / (end - first_night), 0, 1)
+            free = np.where(ts >= first_night, p["disk_free_start_pct"] + (p["disk_free_end_pct"] - p["disk_free_start_pct"]) * frac
                             + rng.normal(0, 0.3, len(ts)), free)
-        for t, c, f in zip(ts, cpu, free):
-            sig_out.append((int(t), tag({
-                "@timestamp": iso(int(t)), "event": {"kind": "metric", "category": ["host"], "dataset": "signage.cms"},
+        for t, c, f, x in zip(ts, cpu, free, tx):
+            out.append((int(t), tag({
+                "@timestamp": iso(int(t)), "event": {"kind": "metric", "category": ["host"], "dataset": "pos.terminal"},
                 "host": {"name": d.name, "cpu": {"usage": round(float(np.clip(c, 0, 1)), 3)}},
-                "retail": {"store": {"id": store.id}, "device": {"role": "signage-player"}},
-                "coldchain": {"edge": {"storage": {"free_pct": round(float(f), 1)}}}})))
-    rng = np.random.default_rng([seed, 7, store.number, 30])
-    watts = 3.0 + 0.4 * np.sin(np.pi * (((ts % DAY) / 3600) - 6) / 16).clip(0) + rng.normal(0, 0.12, len(ts))
-    if story:
-        watts = np.where(ts >= first_night, e["plug_watts_busy"] + rng.normal(0, 0.25, len(ts)), watts)
-    for t, w in zip(ts, watts):
-        plug_out.append((int(t), tag({
-            "@timestamp": iso(int(t)), "event": {"kind": "metric", "category": ["host"], "dataset": "power.plug"},
-            "host": {"name": f"{store.id}-PLUG-01"},
-            "retail": {"store": {"id": store.id}, "device": {"role": "smart-plug"}},
-            "coldchain": {"edge": {"attached_to": tv.name, "power": {"watts": round(float(max(w, 0.5)), 2)}}}})))
-    return sig_out, plug_out
+                "retail": {"store": {"id": store.id}, "device": {"role": d.role}},
+                "coldchain": {"pos": {"disk_free_pct": round(float(f), 1), "tx_per_min": round(float(x), 2)}}})))
+    return out
 
 
-# --- writing, with the offline window ----------------------------------------------------------
-
-def write_late(sink, store: Store, layer: str, dataset: str, records: list[tuple[int, dict]], rotation: int) -> int:
-    """Write records; those inside S07's offline window go in one file uploaded after it, with event.ingested set."""
-    a, b, up = offline_span()
-    late = [(t, r) for t, r in records if store.id == config()["store"] and a <= t <= b]
-    normal = [(t, r) for t, r in records if not (store.id == config()["store"] and a <= t <= b)]
-    n = write_records(sink, layer, dataset, store.id, normal, rotation)
-    if late:
-        for i, (t, r) in enumerate(late):
-            r["event"]["ingested"] = iso(up + 20 + i % 30)
-        late.sort(key=lambda x: x[0])
-        write_chunk(sink, layer, dataset, store.id, up,
-                    [json.dumps(r, separators=(",", ":")) for _, r in late], seq=1)
-        n += len(late)
-    return n
+# --- writing ------------------------------------------------------------------------------------
 
 
 def roll_up(records: list[tuple[int, dict]], step: int, fields: list[tuple[str, ...]]) -> list[tuple[int, dict]]:
@@ -258,8 +227,6 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--stores", help="comma-separated store ids (default: all)")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--resume", action="store_true")
-    ap.add_argument("--raw-only", action="store_true",
-                    help="write only the raw/ files of S07 (rewrites them; the indexed detect/ files are not uploaded again)")
     args = ap.parse_args(argv)
 
     chain = load_chain()
@@ -267,19 +234,13 @@ def main(argv: list[str] | None = None) -> None:
     stores = [chain.store(s) for s in args.stores.split(",")] if args.stores else chain.stores
     for store in stores:
         started, counts = time.time(), {}
-        raw, summary, tls = store_flows(chain, store, args.seed)
-        sig5, plug5 = edge_series(store, chain, args.seed, 300)
-        if not args.raw_only:
-            counts["summary"] = write_late(sink, store, "detect", "netflow.summary", summary, 60)
-            counts["signage"] = write_late(sink, store, "detect", "signage.cms",
-                                           roll_up(sig5, 300, [("host", "cpu", "usage"), ("coldchain", "edge", "storage", "free_pct")]), 60)
-            counts["plug"] = write_late(sink, store, "detect", "power.plug",
-                                        roll_up(plug5, 300, [("coldchain", "edge", "power", "watts")]), 60)
+        _, summary, tls = store_flows(chain, store, args.seed)
+        pos5 = pos_series(store, chain, args.seed, 300)
+        counts["summary"] = write_records(sink, "detect", "netflow.summary", store.id, summary, 60)
+        counts["pos"] = write_records(sink, "detect", "pos.terminal", store.id, roll_up(
+            pos5, 300, [("host", "cpu", "usage"), ("coldchain", "pos", "disk_free_pct"), ("coldchain", "pos", "tx_per_min")]), 60)
         if store.id == config()["store"]:
-            counts["flows raw"] = write_late(sink, store, "raw", "netflow.log", raw, 60)
-            counts["tls raw"] = write_late(sink, store, "raw", "network_traffic.tls", tls, 60)
-            counts["signage raw"] = write_late(sink, store, "raw", "signage.cms", sig5, 60)
-            counts["plug raw"] = write_late(sink, store, "raw", "power.plug", plug5, 60)
+            counts["tls"] = write_records(sink, "detect", "network_traffic.tls", store.id, tls, 60)
         print(f"{store.id}: {counts} in {time.time() - started:.1f}s", flush=True)
     print(f"done: {sink.files} files, {sink.bytes / 1e6:.1f} MB"
           + (f", {sink.skipped} already present" if getattr(sink, "skipped", 0) else ""))

@@ -51,10 +51,10 @@ def limits_rows() -> list[dict]:
 
 
 def profile_rows() -> list[dict]:
-    """Allowed TLS server names per device role (MUD-style). The TV box may NOT reach the model hub."""
+    """Allowed TLS server names per device role (MUD-style). The back-office POS may NOT reach sync.example-cdn.net."""
     allowed = {
-        "tv-box": ["update.tvbox-vendor.example", "ntp.example"],
-        "signage-player": ["cdn.signage-vendor.example", "ntp.example"],
+        "pos-lane": ["pay.gateway.example", "ntp.example"],
+        "pos-backoffice": ["updates.pos-vendor.example", "ntp.example"],
         "system-manager": ["telemetry.vendor-cloud.example", "ntp.example"],
         "store-server": ["telemetry.vendor-cloud.example", "ntp.example"],
         "camera": ["ntp.example"],

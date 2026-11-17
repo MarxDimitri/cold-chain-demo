@@ -1,37 +1,34 @@
-"""Scenario B (epilogue, hypothetical): ML jobs, the new-terms rule and the scoring on the indexed epilogue streams.
+"""The POS scenario (hypothetical): ML jobs, the new-terms rule and the scoring on the indexed POS streams.
 
-    python -m coldchain.epilogue setup      # ML jobs + datafeeds (idempotent), federation datasets for the raw side
-    python -m coldchain.epilogue start      # open jobs and run the datafeeds over the epilogue window
+    python -m coldchain.epilogue setup      # ML jobs + datafeeds (idempotent)
+    python -m coldchain.epilogue start      # open jobs and run the datafeeds over the scenario window
     python -m coldchain.epilogue status
     python -m coldchain.epilogue score      # which hosts each job flagged, when, and whether a peer was flagged
     python -m coldchain.epilogue rule       # create the new-terms rule (disabled) and preview it over the window
     python -m coldchain.epilogue reset      # delete jobs and datafeeds
 
-The data is in the `epilogue` namespace (logs-netflow.summary-epilogue, logs-signage.cms-epilogue, logs-power.plug-epilogue),
-so it never mixes with the main demo's streams. All jobs are population jobs: a device is compared with its peers.
+The data is in the `pos` namespace (logs-netflow.summary-pos, logs-pos.terminal-pos, logs-network_traffic.tls-pos), so it never
+mixes with the main demo's streams. All jobs are population jobs: a device is compared with its peers.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 
 import requests
 from elasticsearch import ConflictError, NotFoundError
 
 from . import scenario_b
+from .dashboards import kibana
 from .elastic import client
-from .federation import env
 
-SUMMARY = "logs-netflow.summary-epilogue"
-SIGNAGE = "logs-signage.cms-epilogue"
-PLUG = "logs-power.plug-epilogue"
+SUMMARY = "logs-netflow.summary-pos"
+POS = "logs-pos.terminal-pos"
 
 EXPECTED = {  # job -> the one host the story is about
-    "edge-inbound-population": "S07-TVBOX-01",
-    "edge-signage-cpu": "S07-SIG-02",
-    "edge-signage-storage": "S07-SIG-02",
-    "edge-plug-power": "S07-PLUG-01",
+    "edge-inbound-population": "S07-POS-BO-01",
+    "edge-pos-cpu": "S07-POS-BO-01",
+    "edge-pos-disk": "S07-POS-BO-01",
 }
 
 
@@ -44,7 +41,7 @@ def _job(desc: str, detector: dict, influencers: list[str], index: str) -> dict:
 
 
 JOBS = {
-    # Bytes received per device in an hour against the other devices of the same role. A TV box that pulls 20-60 MB
+    # Bytes received per device in an hour against the other devices of the same role. A back-office POS PC that pulls 20-60 MB
     # chunks every night stands out from 19 peers that receive about 35 MB a week in all.
     "edge-inbound-population": _job(
         "Bytes received per hour, compared with the devices of the same role",
@@ -52,21 +49,18 @@ JOBS = {
          "by_field_name": "retail.device.role",
          "detector_description": "high bytes received per device vs. peers of the same role"},
         ["host.name", "retail.device.role", "retail.store.id"], SUMMARY),
-    "edge-signage-cpu": _job(
-        "Signage player CPU compared with the other players",
+    "edge-pos-cpu": _job(
+        "POS terminal CPU compared with the other terminals",
         {"function": "high_mean", "field_name": "host.cpu.usage", "over_field_name": "host.name",
-         "detector_description": "high mean CPU per signage player vs. peers"},
-        ["host.name", "retail.store.id"], SIGNAGE),
-    "edge-signage-storage": _job(
-        "Signage player free storage compared with the other players",
-        {"function": "low_mean", "field_name": "coldchain.edge.storage.free_pct", "over_field_name": "host.name",
-         "detector_description": "low mean free storage per signage player vs. peers"},
-        ["host.name", "retail.store.id"], SIGNAGE),
-    "edge-plug-power": _job(
-        "TV box power draw compared with the other boxes",
-        {"function": "high_mean", "field_name": "coldchain.edge.power.watts", "over_field_name": "host.name",
-         "detector_description": "high mean power draw per smart plug vs. peers"},
-        ["host.name", "retail.store.id"], PLUG),
+         "by_field_name": "retail.device.role",
+         "detector_description": "high mean CPU per POS terminal vs. peers of the same role"},
+        ["host.name", "retail.store.id"], POS),
+    "edge-pos-disk": _job(
+        "POS terminal free disk compared with the other terminals",
+        {"function": "low_mean", "field_name": "coldchain.pos.disk_free_pct", "over_field_name": "host.name",
+         "by_field_name": "retail.device.role",
+         "detector_description": "low mean free disk per POS terminal vs. peers of the same role"},
+        ["host.name", "retail.store.id"], POS),
 }
 
 
@@ -159,24 +153,16 @@ def score(es) -> dict:
 # --- the new-terms rule ------------------------------------------------------------------------
 
 RULE = {
-    "name": "First-seen internal peer (hypothetical epilogue)",
-    "description": "A device talks to an address it never talked to in the last 14 days. Scenario B: a TV box reaching the "
-                   "system manager. Hypothetical scenario; synthetic data.",
-    "type": "new_terms", "language": "kuery", "query": "labels.namespace : epilogue",
+    "name": "First-seen internal peer (hypothetical POS scenario)",
+    "description": "A device talks to an address it never talked to in the last 14 days. A back-office POS reaching the "
+                   "refrigeration system manager. Hypothetical scenario; synthetic data.",
+    "type": "new_terms", "language": "kuery", "query": "labels.namespace : pos",
     "index": ["logs-netflow.summary-*"], "new_terms_fields": ["source.ip", "destination.ip"],
     "history_window_start": "now-14d", "interval": "1d", "from": "now-1d", "to": "now",
     "risk_score": 47, "severity": "medium", "enabled": False,
-    "tags": ["coldchain", "epilogue", "hypothetical"],
+    "tags": ["coldchain", "pos", "hypothetical"],
     "threat": [],
 }
-
-
-def kibana() -> tuple[str, requests.Session]:
-    e = env()
-    s = requests.Session()
-    s.headers.update({"Authorization": f"ApiKey {e['ELASTIC_API_KEY']}", "kbn-xsrf": "true",
-                      "Content-Type": "application/json", "elastic-api-version": "2023-10-31"})
-    return e["KIBANA_URL"].rstrip("/"), s
 
 
 def rule() -> None:

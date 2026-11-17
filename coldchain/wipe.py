@@ -4,8 +4,8 @@
     python -m coldchain.wipe --yes      # remove it
 
 Removes: the Kibana dashboards, detection rules and their alerts, the Agent Builder agent and tools, the hunt workflow, the ML
-jobs and datafeeds, the Fleet policy and integration of the collector, the federation data source and datasets, the frozen
-copy of the history and its snapshot, the data streams, templates, pipelines and knowledge-base indices.
+jobs and datafeeds, the Fleet policy and integration of the collector, the data streams, templates, pipelines and
+knowledge-base indices.
 
 Does not remove: the deployment itself, Fleet's own monitoring streams (`logs-elastic_agent*`, `metrics-fleet_server*`),
 anything that is not named in this repo's code. The AWS side is `make teardown-aws`. Stop the collector first
@@ -17,18 +17,17 @@ import argparse
 
 from elasticsearch import NotFoundError
 
-from . import epilogue, frozen, hunt, ml
+from . import epilogue, hunt
 from .agent import AGENT_ID, TOOLS
 from .dashboards import DASHBOARDS, kibana
 from .elastic import client
-from .federation import DATASETS, SOURCE, Es
 from .fleet import INTEGRATION_NAME, POLICY_NAME
 from .prep import STREAMS
 
 OLD_DASHBOARDS = ["coldchain-act1-estate", "coldchain-act4-evidence"]
 RULES = ["coldchain-limits", "coldchain-warm-no-defrost", "coldchain-first-seen-peer"]
-STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-signage.cms-*", "logs-power.plug-*"]
-TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-signage.cms", "logs-power.plug")
+STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-pos.terminal-*", "logs-network_traffic.tls-*"]
+TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-pos.terminal", "logs-network_traffic.tls")
 INDEX_PATTERNS = ["kb-*", "cc-history-audit*", "cc-hunt-findings", "cc-esql-moment", "test-coldchain-*", "zzcheck*"]
 PIPELINES = ["coldchain-route", hunt.PIPELINE]
 H = {"x-elastic-internal-origin": "Kibana", "elastic-api-version": "2023-10-31"}
@@ -38,7 +37,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--yes", action="store_true", help="remove (default: list only)")
     yes = ap.parse_args(argv).yes
-    es, (url, s), fed = client(), kibana(), Es()
+    es, (url, s) = client(), kibana()
     tag = "removed" if yes else "would remove"
 
     def kb(method: str, path: str, **kw) -> int:
@@ -75,7 +74,7 @@ def main(argv: list[str] | None = None) -> None:
     do(f"workflow {wid}", lambda: s.delete(f"{url}/api/workflows/workflow/{wid}", timeout=60), wid is not None)
 
     print("Machine learning")
-    for job in list(ml.JOBS) + list(epilogue.JOBS):
+    for job in list(epilogue.JOBS):
         present = job in [j["job_id"] for j in es.ml.get_jobs(job_id="_all", allow_no_match=True)["jobs"]]
 
         def drop(job=job) -> None:
@@ -103,13 +102,6 @@ def main(argv: list[str] | None = None) -> None:
         do(f"agent policy {POLICY_NAME}, its integration {INTEGRATION_NAME}, enrolled agents and enrollment keys", drop_policy)
 
     print("Elasticsearch")
-    do(f"federation datasets {list(DATASETS)}", lambda: [fed.call("DELETE", f"/_query/dataset/{d}", ok_404=True) for d in DATASETS],
-       fed.call("GET", f"/_query/dataset/{next(iter(DATASETS))}", ok_404=True) is not None)
-    do(f"federation data source {SOURCE}", lambda: fed.call("DELETE", f"/_query/data_source/{SOURCE}", ok_404=True),
-       fed.call("GET", f"/_query/data_source/{SOURCE}", ok_404=True) is not None)
-    do("frozen copy and its snapshot (cc-history-audit)", lambda: frozen.delete(quiet=True),
-       es.indices.exists(index=frozen.INDEX) or any(sn["snapshot"] == frozen.SNAPSHOT for sn in es.snapshot.get(
-           repository=frozen.REPO, snapshot=frozen.SNAPSHOT, ignore_unavailable=True).get("snapshots", [])))
     for pat in STREAM_PATTERNS:
         names = [d["name"] for d in es.indices.get_data_stream(name=pat, expand_wildcards="all").get("data_streams", [])] \
             if es.indices.exists(index=pat) or True else []

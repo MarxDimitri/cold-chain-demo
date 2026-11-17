@@ -8,7 +8,7 @@ import pytest
 from coldchain import backfill, lookup
 from coldchain.chain import cabinets, load_attack, load_chain
 
-KEY = re.compile(r"^(detect|raw)/dataset=[\w.]+/store=S\d\d/dt=\d{4}-\d\d-\d\d/hh=\d\d/S\d\d-\d+(-\d+)?\.ndjson\.gz$")
+KEY = re.compile(r"^detect/dataset=[\w.]+/store=S\d\d/dt=\d{4}-\d\d-\d\d/hh=\d\d/S\d\d-\d+(-\d+)?\.ndjson\.gz$")
 
 
 @pytest.fixture(scope="module")
@@ -30,8 +30,7 @@ def read(root: Path, pattern: str):
 @pytest.fixture(scope="module")
 def out(tmp_path_factory):
     root = tmp_path_factory.mktemp("bucket")
-    backfill.main(["--target", "local", "--out", str(root), "--stores", "S07,S03",
-                   "--detect-days", "2", "--flow-days", "1"])
+    backfill.main(["--target", "local", "--out", str(root), "--stores", "S07,S03", "--detect-days", "2"])
     return root
 
 
@@ -58,20 +57,17 @@ def test_bucket_layout(out):
     assert keys and all(KEY.match(k) for k in keys)
 
 
-def test_first_visit_only_in_raw(out, attack):
+def test_first_visit_is_in_the_year_of_indexed_history(out, attack):
     ip = attack["attacker_ip"]
-    raw = [r for r in read(out, "raw/dataset=coldchain.audit/**/*.ndjson.gz")
-           if r.get("source", {}).get("ip") == ip]
-    detect = [r for r in read(out, "detect/dataset=coldchain.audit/**/*.ndjson.gz")
-              if r.get("source", {}).get("ip") == ip]
-    assert len(raw) == 1 and raw[0]["retail"]["store"]["id"] == "S07"
-    assert raw[0]["@timestamp"].startswith("2026-07-09T02:17")  # T0 - 126 days, the first of three visits (S07, S11, S19)
-    assert detect == []
+    visits = [r for r in read(out, "detect/dataset=coldchain.audit/**/*.ndjson.gz") if r.get("source", {}).get("ip") == ip]
+    assert len(visits) == 1 and visits[0]["retail"]["store"]["id"] == "S07"
+    assert visits[0]["@timestamp"].startswith("2026-07-09T02:17")  # T0 - 126 days, the first of three visits (S07, S11, S19)
 
 
 def test_no_attack_traffic_in_history(out, attack):
     for r in read(out, "detect/**/*.ndjson.gz"):
-        assert attack["attacker_ip"] not in json.dumps(r)
+        if attack["attacker_ip"] in json.dumps(r):  # only the first visit of the audit history
+            assert r["event"]["dataset"] == "coldchain.audit" and r["event"]["action"] == "logged-in"
 
 
 def test_telemetry_in_band(out, chain):
@@ -84,12 +80,11 @@ def test_telemetry_in_band(out, chain):
     assert len(frozen_max) + len(chilled) > 24 * 2 * 1400
 
 
-def test_flows_and_summaries_consistent(out):
-    raw = list(read(out, "raw/dataset=netflow.log/store=S07/**/*.ndjson.gz"))
+def test_flow_summaries_cover_the_pos_and_the_manager(out):
     summ = list(read(out, "detect/dataset=netflow.summary/store=S07/**/*.ndjson.gz"))
-    assert raw and summ
-    assert sum(r["network"]["bytes"] for r in raw) == sum(s["network"]["bytes"] for s in summ)
-    assert all(not r["source"]["ip"].startswith("203.0.113.") for r in raw)
+    assert summ and all(not s["source"]["ip"].startswith("203.0.113.") for s in summ)
+    roles = {s["retail"]["device"]["role"] for s in summ}
+    assert {"pos-lane", "pos-backoffice", "system-manager", "store-server"} <= roles
 
 
 def test_lookup_assets_support_act6(chain):

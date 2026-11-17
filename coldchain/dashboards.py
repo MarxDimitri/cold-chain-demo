@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import requests
 
 from .elastic import client
-from .federation import env
+from .envfile import load_env
 
 T = "@timestamp >= ?_tstart AND @timestamp < ?_tend"
 NOMINAL = 'CASE(coldchain.application == "frozen", -24.0, 2.0)'  # chain.yaml: frozen at -24 C, chilled at +2 C
@@ -66,8 +66,6 @@ class Dash:
 ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch"),
         ("coldchain-act1a-cabinet", "Act 1", "One cabinet"),
         ("coldchain-act1b-estate", "Act 2", "The whole estate"),
-        ("coldchain-act5a-history", "Act 3a", "History read in place"),
-        ("coldchain-act5b-history-frozen", "Act 3b", "History on the frozen tier"),
         ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
         ("coldchain-epilogue-edge", "Act 5", "Edge devices")]
 NAV_HEIGHT = 3
@@ -192,20 +190,6 @@ def act0() -> Dash:
                        "FROM cc-history-audit               // frozen tier: 12 months, about a second\n"
                        "FROM raw_store_audit                // raw files in S3, never ingested: 12 months, about 80 seconds (experimental)\n"
                        "FROM kb-assets | ...                // the knowledge base: context joined to any of them\n```", h=9, d=d))
-    d.row(9)
-    from .sources import CORRELATION  # one statement over the live index, the raw files and the knowledge base
-    d.panels.append(md("### One statement, three sources\nCorrelate across different sources in one ES|QL statement: the live index and the raw "
-                       "files in S3 (two subqueries), joined to the knowledge base. Which stores did the attacker's address visit, when "
-                       "first, where is that on record, and whose contractor account runs each store? The result below was measured when "
-                       "`make sources` last ran (about 75 s: the raw files are read in place); run `make correlation` after the attack to "
-                       "see today's visits next to the history.\n\n```\n" + CORRELATION + "\n```", h=14, d=d))
-    d.row(14)
-    q = ("FROM cc-esql-correlation | SORT first_seen | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen), "
-         "measured = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", measured_at) | KEEP store, contractor, visits, first_seen, seen_in, seconds, measured")
-    cols = [("store", 80), ("contractor", 110), ("visits", 80), ("first_seen", 160), ("seen_in", 330), ("seconds", 90), ("measured", 160)]
-    d.add("Attacker address: visits per store, where it is on record, and the contractor account", {
-        "type": "data_table", "time_range": ALL_TIME, "data_source": esql(q), "metrics": [{"column": c, "width": w} for c, w in cols]},
-        48, 9, query=q)
     d.row(9)
     for i, tier in enumerate(TIER_COLORS):
         q = f'FROM kb-sources | WHERE tier == "{tier}" | STATS rows = SUM(rows), sources = COUNT(*)'
@@ -383,120 +367,6 @@ def epilogue() -> Dash:
     return d
 
 
-# --- Act 5: the history nobody ingested (federation, experimental) -----------------------------------------------
-
-OUTSIDE = ("FROM raw_store_audit | WHERE event.action == \"logged-in\" "
-           "| EVAL ip = TO_STRING(source.ip), store = TO_STRING(retail.store.id) "
-           f'| WHERE NOT CIDR_MATCH(TO_IP(ip), "198.51.100.0/24") AND NOT CIDR_MATCH(TO_IP(ip), "10.0.0.0/8")')
-
-
-# Two layers, two queries. Kibana adds the picker's time filter to every panel query and would drop the federated rows
-# in a query that also reads an index, so the history layer reads the dataset alone (it ignores the picker) and the blip
-# layer reads the indexed audit (it follows the picker: "Last 24 hours" during a live run).
-HISTORY = """FROM raw_store_audit
-| WHERE event.action == "logged-in"
-| EVAL ip = TO_STRING(source.ip), store = TO_STRING(retail.store.id)
-| WHERE NOT CIDR_MATCH(TO_IP(ip), "198.51.100.0/24") AND NOT CIDR_MATCH(TO_IP(ip), "10.0.0.0/8")
-| STATS first_seen = MIN(@timestamp) BY store
-| EVAL kind = "Attacker logs in (first time per store)"
-| STATS stores = COUNT(*) BY week = BUCKET(first_seen, 1 week), kind
-| SORT week"""
-
-BLIP = """FROM logs-coldchain.audit-default
-| WHERE event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" AND coldchain.parameter.value.new > 5
-| STATS first_seen = MIN(@timestamp) BY retail.store.id
-| EVAL kind = "Setpoint changed to +50 (the blip)"
-| STATS stores = COUNT(*) BY week = BUCKET(first_seen, 1 week), kind
-| SORT week"""
-
-
-def act5() -> Dash:
-    d = Dash("coldchain-act5a-history", "CC Act 3a: The history nobody ingested",
-             "A year of raw store audit read in place from S3 by ES|QL data federation (experimental). Synthetic data.",
-             time=("now-1y", "now"))
-    d.panels.append(md("## Act 3a: four months of silence, then the blip\n**Federation, experimental.** A year of raw store audit, "
-                       "read in place from S3 and never ingested, and the live blip from today's indexed audit. The history takes about 75 seconds. "
-                       "Each bar is the number of stores per week: the attacker's first login to a store, and the stores whose "
-                       "setpoints were then changed to +50. The chart has its own one-year range, so the time picker does not matter here.", h=5, d=d))
-    d.row(5)
-    title = "Stores the attacker logged into for the first time, and stores whose setpoints changed"
-    layers = [{"type": "bar", "data_source": esql(q), "x": {"column": "week"}, "y": [{"column": "stores"}],
-               "breakdown_by": {"column": "kind"}} for q in (HISTORY, BLIP)]
-    d.add(title, {"type": "xy", "layers": layers, "axis": {"x": {"title": {"visible": False}},
-                                                           "y": {"title": {"text": "stores per week", "visible": True}}},
-                  "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"},
-                  "time_range": {"from": "now-1y", "to": "now"}}, 48, 16, query=HISTORY)
-    d.queries.append((title + " (blip layer)", BLIP, {}))
-    d.row(16)
-    d.panels.append(md("### The query behind the history layer\nOne language, any source: this is the whole question, in ES|QL. Change only the "
-                       "`FROM` line and it runs on the frozen copy (Act 3b) or on the live index.\n\n```\n" + HISTORY + "\n```", h=11, d=d))
-    d.row(11)
-    return d
-
-
-# --- Act 5b: the same history, ingested and kept on the frozen tier -----------------------------------------------
-
-from .sources import QUESTION  # noqa: E402
-
-QUESTION_TEXT = QUESTION.format(src="<source>").replace(" | ", "\n| ")
-
-OUTSIDE_FROZEN = ('WHERE event.action == "logged-in" AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24") '
-                  'AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")')
-HISTORY_FROZEN = f"""FROM cc-history-audit
-| {OUTSIDE_FROZEN}
-| STATS first_seen = MIN(@timestamp) BY store = retail.store.id
-| EVAL kind = "Attacker logs in (first time per store)"
-| STATS stores = COUNT(*) BY week = BUCKET(first_seen, 1 week), kind
-| SORT week"""
-
-
-def act5b() -> Dash:
-    d = Dash("coldchain-act5b-history-frozen", "CC Act 3b: The history ingested at a predictable price",
-             "The same year of store audit as Act 3a, ingested once and kept on the frozen tier. Synthetic data.",
-             time=("now-1y", "now"))
-    d.panels.append(md("## Act 3b: the same year, ingested, on the frozen tier\n**Your choice.** Act 3a reads the files in place: "
-                       "nothing ingested, about 75 seconds a question (federation, experimental). Here the same history is indexed once, "
-                       "stored as a searchable snapshot in object storage and served from the frozen tier: about a second the first time, "
-                       "a tenth of a second after that. The spend stays controlled because it is fixed by the size of the frozen node and "
-                       "the object storage under it, not by how often you ask.", h=5, d=d))
-    d.row(5)
-    metric(d, "Events in the frozen index", "FROM cc-history-audit | STATS events = COUNT(*)", "events", w=16)
-    metric(d, "Days of history", "FROM cc-history-audit | STATS days = DATE_DIFF(\"days\", MIN(@timestamp), MAX(@timestamp))", "days", w=16, x=16)
-    metric(d, "Stores with an outside first login",
-           f"FROM cc-history-audit | {OUTSIDE_FROZEN} | STATS stores = COUNT_DISTINCT(retail.store.id)", "stores", w=16, x=32)
-    d.row(6)
-    title = "Stores the attacker logged into for the first time, and stores whose setpoints changed"
-    layers = [{"type": "bar", "data_source": esql(q), "x": {"column": "week"}, "y": [{"column": "stores"}],
-               "breakdown_by": {"column": "kind"}} for q in (HISTORY_FROZEN, BLIP)]
-    d.add(title, {"type": "xy", "layers": layers, "axis": {"x": {"title": {"visible": False}},
-                                                           "y": {"title": {"text": "stores per week", "visible": True}}},
-                  "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}, 48, 14, query=HISTORY_FROZEN)
-    d.queries.append((title + " (blip layer)", BLIP, {}))
-    d.row(14)
-    table(d, "First outside login per store",
-          f'FROM cc-history-audit | {OUTSIDE_FROZEN} | STATS first_seen = MIN(@timestamp), logins = COUNT(*) BY store = retail.store.id, '
-          "source = source.ip | SORT first_seen | EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen) "
-          "| KEEP first_seen, store, source, logins", ["first_seen", "store", "source", "logins"], h=9)
-    d.row(9)
-    d.panels.append(md("## One question, three places\nThe same ES|QL, word for word, asked of three places: only the `FROM` changes. "
-                       "The live index holds 35 days, so it cannot see the attacker's first visits. The frozen tier and the raw files can, "
-                       "at very different speed and cost. Measured with `make sources`; repeat runs on the frozen tier come from its cache.\n\n"
-                       "```\n" + QUESTION_TEXT + "\n```", h=9, d=d))
-    d.row(9)
-    q = "FROM cc-esql-moment | SORT order | EVAL seconds = ROUND(seconds, 1) | KEEP place, ask_with, seconds, stores_found, answer"
-    d.add("The same question, three places", {"type": "data_table", "time_range": ALL_TIME, "data_source": esql(q), "metrics": [
-        {"column": c, "width": w} for c, w in (("place", 150), ("ask_with", 330), ("seconds", 90), ("stores_found", 120), ("answer", 600))]},
-        28, 8, query=q)
-    q = "FROM cc-esql-moment | SORT order | KEEP place, seconds"
-    lines(d, "Seconds to answer", q, "place", ["seconds"], w=20, h=8, x=28, kind="bar", ytitle="seconds")
-    d.panels[-1]["config"]["time_range"] = ALL_TIME
-    d.row(8)
-    for p in d.panels:  # these panels have their own one-year range: the time picker does not matter
-        if p["type"] == "vis":
-            p["config"]["time_range"] = {"from": "now-1y", "to": "now"}
-    return d
-
-
 def hunt() -> Dash:
     d = Dash("coldchain-hunt-findings", "CC Act 4: Hunting agent - the agent that keeps looking",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
@@ -548,14 +418,14 @@ def hunt() -> Dash:
 
 # Ids are listed, not read from the builders: `hunt` imports the agent, which imports this module.
 DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
-              "coldchain-act5a-history": act5, "coldchain-act5b-history-frozen": act5b, "coldchain-hunt-findings": hunt,
+              "coldchain-hunt-findings": hunt,
               "coldchain-epilogue-edge": epilogue}
 
 
 # --- push / check ------------------------------------------------------------------------------------------------
 
 def kibana() -> tuple[str, requests.Session]:
-    e = env()
+    e = load_env()
     s = requests.Session()
     s.headers.update({"Authorization": f"ApiKey {e['ELASTIC_API_KEY']}", "kbn-xsrf": "true",
                       "Content-Type": "application/json", "elastic-api-version": "2023-10-31"})

@@ -39,8 +39,8 @@ class PerStore(BaseModel):
     manager_model: str
     patched_firmware: str
     vulnerable_firmware: str
-    signage_players: int
-    tv_boxes: int
+    pos_lanes: int
+    pos_backoffice: int
     cameras: int
 
 
@@ -106,10 +106,10 @@ def devices(chain: Chain, store: Store) -> list[Device]:
         Device(f"{sid}-SRV", sid, "store-server", f"10.{n}.0.10"),
         Device(store.manager, sid, "system-manager", f"10.{n}.0.21", p.manager_model),
     ]
-    out += [Device(f"{sid}-SIG-{i:02d}", sid, "signage-player", f"10.{n}.0.{30 + i}")
-            for i in range(1, p.signage_players + 1)]
-    out += [Device(f"{sid}-TVBOX-{i:02d}", sid, "tv-box", f"10.{n}.0.{40 + i}")
-            for i in range(1, p.tv_boxes + 1)]
+    out += [Device(f"{sid}-POS-{i:02d}", sid, "pos-lane", f"10.{n}.0.{30 + i}")
+            for i in range(1, p.pos_lanes + 1)]
+    out += [Device(f"{sid}-POS-BO-{i:02d}", sid, "pos-backoffice", f"10.{n}.0.{40 + i}")
+            for i in range(1, p.pos_backoffice + 1)]
     out += [Device(f"{sid}-CAM-{i:02d}", sid, "camera", f"10.{n}.0.{50 + i}")
             for i in range(1, p.cameras + 1)]
     return out

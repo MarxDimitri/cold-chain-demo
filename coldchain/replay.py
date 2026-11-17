@@ -37,8 +37,8 @@ TRIGGER = STATE_DIR / "restore.trigger"
 S07_DIR = ROOT / "replay" / "s07"
 PREROLL = 180  # seconds before T0 (logins land at T0-140s)
 TAIL = 300     # seconds of data after the pull-down ends
-LAYERS = {"coldchain.case": ("detect",), "coldchain.probe": ("detect",), "coldchain.audit": ("detect", "raw"),
-          "netflow.summary": ("detect",), "netflow.log": ("raw",)}
+LAYERS = {"coldchain.case": ("detect",), "coldchain.probe": ("detect",), "coldchain.audit": ("detect",),
+          "netflow.summary": ("detect",), "netflow.log": ()}  # raw flows are generated for the attack plan but not written
 
 
 class Replay:
@@ -103,8 +103,6 @@ class Replay:
         for t, sid, rec in p.login_events() + first:
             self.push(t, "coldchain.audit", sid, rec)
         raw = p.attack_flows()
-        for t, sid, rec in raw:
-            self.push(t, "netflow.log", sid, rec)
         for w, sid, rec in p.summarize(raw):
             self.push(w + WINDOW - 1, "netflow.summary", sid, rec, ts=w)
 
@@ -118,9 +116,7 @@ class Replay:
 
     def push_normal_flows(self, wstart: int) -> None:
         for store in self.chain.stores:
-            raw, summary = flows(self.chain, store, wstart, 0, self.args.seed, windows=1)
-            for ts, rec in raw:
-                self.push(ts, "netflow.log", store.id, rec)
+            _, summary = flows(self.chain, store, wstart, 0, self.args.seed, windows=1)
             for ts, rec in summary:
                 self.push(wstart + WINDOW - 1, "netflow.summary", store.id, rec, ts=ts)
 

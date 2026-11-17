@@ -13,11 +13,9 @@ def test_tools_declare_every_parameter_they_use():
         assert t["query"].lstrip().startswith("FROM") and t["description"]
 
 
-def test_agent_uses_existing_tools_and_labels_federation():
+def test_agent_uses_existing_tools_and_runs_no_containment():
     body = agent.agent_body()
     assert set(body["configuration"]["tools"][0]["tool_ids"]) == {t["id"] for t in agent.TOOLS}
-    for t in agent.TOOLS:
-        if "raw_" in t["query"]:
-            assert "FEDERATION (experimental)" in t["description"], t["id"]
-    assert "never run containment" in agent.INSTRUCTIONS and "experimental" in agent.INSTRUCTIONS
+    assert not any("raw_" in t["query"] for t in agent.TOOLS)  # no federation any more
+    assert "never run containment" in agent.INSTRUCTIONS
     assert agent.DEFAULT_QUESTION

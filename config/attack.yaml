@@ -13,11 +13,11 @@ touched_stores: [S01, S02, S04, S06, S07, S08, S10, S11, S19]
 
 # 46 cabinets in 3 stores get setpoint -24 -> +50 at T0+5s.
 # The story: the attacker reaches 8 stores' managers from the internet (login from the attacker address), but in S07 the
-# change is made from inside the store: the compromised TV box (see config/scenario_b.yaml) writes the setpoints.
+# change is made from inside the store: the compromised back-office POS (see config/scenario_b.yaml) writes the setpoints.
 setpoint_change:
   offset_seconds: 5
   new_value: 50.0
-  from_inside: {S07: tv-box}
+  from_inside: {S07: pos-backoffice}
   cabinets:
     S07: {from: C01, to: C16}
     S11: {from: C01, to: C16}
