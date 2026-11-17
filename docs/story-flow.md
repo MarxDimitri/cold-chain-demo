@@ -1,34 +1,37 @@
-# Story flow v3: blip, history, the TV box, the agentic SOC (2026-11-11)
+# Story flow, simplified version: six acts in 15 minutes
 
-The main path is four beats. The earlier acts 2, 3, 6 and 7 stay built and become an optional appendix (detection by rules, the
-hunt for the next stores, the response). The evidence dashboard (old Act 4) was removed. Dashboard names are "CC Act 0" to "CC Act 5". Everything is synthetic and fictional.
+The path: **we search where the light is** (Act 0), a blip in one cabinet (Act 1), the same blip across the estate (Act 2), a year of
+history nobody looked at (Act 3), an agent that finds a lead nobody asked for (Act 4), and the POS terminal behind it (Act 5).
+Everything is synthetic and fictional. The full version (Hosted, federation, TV-box epilogue) is the git tag `v1-ech-federation-tv`.
 
-| Beat | Screen | What the audience sees | Source |
-|---|---|---|---|
-| Act 0. The realms you usually do not watch | `coldchain-act0-sources` | The opener: every dataset in five tiers (live index, frozen tier, raw files in S3, knowledge base, what the demo produces), how big and how far back each goes, and the same `FROM` line for each. The point: one platform, one language (ES\|QL), so you can ask questions nobody modelled in advance. | catalog `kb-sources` |
-| Act 1. One cabinet, the contractor's view | `coldchain-act1a-cabinet` (S07-C05), picker "Last 24 hours" | What a contractor sees: one cabinet, its air temperature and setpoint, its changes. The setpoint jumps to +50 and the cabinet warms: one odd controller, no pattern, no alert. Same indexed data as 1b, filtered to one device. | indexed `detect/` |
-| Act 2. The same blip across the whole estate | `coldchain-act1b-estate`, picker "Last 24 hours", live `make demo` | Central IT's view of the same moment, plus an inventory of what it knows (cabinets, signage, TV boxes, cameras, routers; only some report live). Every tile is green, then 46 setpoint changes in 3 stores and nobody alerted. In the table: S11 and S19 changed from `203.0.113.47`, **S07 from `10.7.0.41`, an address inside the store**. | indexed `detect/` |
-| Act 3a. The history nobody ingested | `coldchain-act5a-history` | A year of raw audit read in place (about 700k events, never ingested). The same internet address logged in to **S07 126 days ago, S11 84 days ago, S19 49 days ago**: success, no changes. They are the three stores hit at T0. | federation (experimental), `raw/` |
-| Act 3b. The history ingested at a predictable price (with "one question, three places") | `coldchain-act5b-history-frozen` | The same year of audit ingested once into an index kept on the frozen tier (searchable snapshot): about 1 s the first query, 0.1 s after, against about 75 s in place. You choose: read in place (nothing ingested) or go faster on a fixed-size frozen node. | indexed, frozen tier |
-| Act 4. Hunting agent, the agent that keeps looking | `coldchain-hunt-findings` (AlertZero pattern, preview) | Without anyone asking, a workflow runs the SOC agent every 30 minutes over live data, the raw history, device profiles and exposure, and records findings with evidence and a proposed action. This is the bridge to the security product: rules detect, the agent hunts and raises a lead nobody asked for (a TV box talking to a store's system manager), and Elastic's AlertZero Watches do the same on a deployment that offers them. | `cc-hunt-findings` |
-| Act 5. Edge devices on no one's radar (follow the lead, epilogue) | `coldchain-epilogue-edge`, picker 2026-10-22 to 2026-11-11 | In the three weeks before the blip a TV box in the S07 staff room pulled 4.6 GB over 9 nights from `models.example-hub.net`, signage CPU and storage changed, the plug power doubled, and from 2026-11-09 the TV box called the system manager on tcp/80 for the first time. At T0 that same box writes S07's setpoints. | indexed summaries + federated TLS (hypothetical) |
-| Act 4 (asked). The agentic SOC | Kibana > Agent Builder, agent "Cold-chain SOC agent (preview)" | One question, one agent, eight tools. It tells the story in order (blip, history, store, next stores), names the 7 stores still at risk and the shared contractor account, and proposes containment. It runs nothing. | all of the above |
+| Time | Act | Dashboard id | What the audience sees | Source |
+|---|---|---|---|---|
+| 0:00 (1.5 min) | **0. The realms you usually do not watch** | `coldchain-act0-sources` | A streetlight over endpoints, firewalls and identity: what you usually watch. In the dark: cabinet telemetry, controller audit, independent probes, network flows, POS terminals, a year of history. One card per source, with its size. | indexed data, `kb-sources` |
+| 1:30 (1.5 min) | **1. One cabinet, the contractor's view** | `coldchain-act1a-cabinet` | One cabinet (S07-C05): its setpoint goes to +50 and the air warms. One odd controller, no pattern, no alert. | indexed `detect/` |
+| 3:00 (2.5 min) | **2. The same blip across the whole estate** | `coldchain-act1b-estate` | Twenty stores in one look (red: setpoints raised). 46 changes in 3 stores; S11 and S19 from `203.0.113.47`, **S07 from `10.7.0.41`, an address inside the store**. Rule 1 alerts about 1.5 minutes after T0. | indexed `detect/` |
+| 5:30 (2.5 min) | **3. The history nobody looked at** | `coldchain-act3-history` | A year of store audit. The same internet address logged in to **S07 126 days ago, S11 84 days ago, S19 49 days ago**: success, no changes. They are the three stores hit at T0. | indexed audit |
+| 8:00 (3.5 min) | **4. Hunting agent** | `coldchain-hunt-findings` | "Nobody asked, and something is going on." The agent's findings as cards: first visits, setpoint changes, exposed controllers on one contractor account, and **a back-office POS PC talking to the system manager**. It proposes, it runs nothing. | `cc-hunt-findings` |
+| 11:30 (3 min) | **5. The POS that nobody watched** | `coldchain-pos-evidence` | The evidence, hypothetical and synthetic: a 4 GB download at night from `sync.example-cdn.net` (not in the device profile, an unusual JA3), CPU at 88% while the store is closed, the disk filling, and from 2026-11-09 the first call to the system manager. The store network is flat: nothing separates the POS from refrigeration. | indexed summaries and TLS |
+| 14:30 (0.5 min) | Close | | Rules detect, the agent hunts, the same language everywhere. | |
 
 ## How it connects
 
-- The attacker walked into S07, S11 and S19 months ago (history), reached S07's LAN through a TV box (epilogue), and at T0 changed
-  setpoints from the internet (S11, S19) and from inside (S07). The blip is the effect; beats 2 and 3 are the cause.
-- The knowledge base ties it together: `kb-controller-limits` says +50 is the documented maximum and far outside normal,
-  `kb-device-profiles` says a TV box may not talk to the model hub, `kb-assets` knows which controllers face the internet.
+- The attacker walked into S07, S11 and S19 months ago (Act 3), reached S07's network through a back-office POS (Act 5), and at T0
+  changed setpoints from the internet (S11, S19) and from inside (S07). The blip (Acts 1 and 2) is the effect; Acts 3 and 5 are the
+  cause; Act 4 is how an agent connects them.
+- The knowledge base ties it together: `kb-controller-limits` says +50 is the documented maximum, `kb-device-profiles` says which
+  servers a POS may reach, `kb-assets` knows which controllers face the internet and which contractor account serves them.
 
 ## Stage script
 
-1. `make demo` (live, real clock, uploads to S3, waits for `make restore`). It first writes and indexes a day of normal data so the dashboards start with context (about a minute), then prints `T0=...`. Open Act 1 on "Last 24 hours" with auto-refresh.
-2. Acts 1 and 2: green, then the blip about 4 minutes in. Point at the two kinds of source address.
-3. Act 3a (and 3b): open the history dashboard. "A year of raw store data, never ingested, one query." Say "experimental".
-4. Act 4, the agent: "something is going on, and nobody asked." Open the findings (or ask the scripted question: `make agent-ask`, or paste it in Agent Builder, and show the tool calls). Point at the TV box talking to the system manager.
-5. Act 5, the lead: "let's see what the TV boxes are doing." Open the epilogue dashboard on 2026-10-22 to 2026-11-11. Say "hypothetical, synthetic".
-6. `make demo` has already enabled the rules: rule 1 alerts appear about a minute after the blip, rule 2 and the warm tile about 10 minutes after. `make restore` when you want containment (it restores by itself after 30 minutes). Afterwards `make clean-run SINCE=<start time>`.
+1. **Four minutes before you present:** `make demo`. It writes and indexes a 6 hour pre-roll (about 3 minutes), then the replay
+   runs: logins at T0 minus 2m20s, 46 setpoint changes at T0 + 5 s, rule 1 alerts about 1.5 minutes later. T0 lands at about minute 2 of the talk.
+2. Act 0: "we search where the light is".
+3. Acts 1 and 2: open them on "Last 24 hours" with auto-refresh. Point at the two kinds of source address.
+4. Act 3: "a year of store audit, one question". The same address, months ago.
+5. Act 4: the findings. Point at the POS finding. Optionally `make agent-ask`, or paste the question into Agent Builder.
+6. Act 5: "let's see what the POS terminal is doing." Say "hypothetical, synthetic".
+7. `make restore` when you want containment (it restores by itself after 30 minutes). Afterwards the cleanup command that `make demo` printed (`make reset-demo SINCE=...`).
 
 ## Agent question
 
