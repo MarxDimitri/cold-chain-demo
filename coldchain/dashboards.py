@@ -325,17 +325,25 @@ def act1() -> Dash:
          "AND coldchain.case.setpoint > 5 BY store = retail.store.id | SORT store")
     custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
     d.row(9)
-    # One query over telemetry and audit: every 5-minute slot has a value, so the red line sits at 0 between changes.
+    # One query over telemetry and audit. The setpoint changes are vertical bars on the right axis: warming (raised) red, cooling
+    # (lowered) blue, stacked; the lines are the hottest and coolest store (median cabinet).
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
-         f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL} "
-         '| STATS typical = MEDIAN(warm), chg = COUNT(*) WHERE event.action == "parameter-change" '
+         f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL}, "
+         'change = event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" '
+         "| STATS typical = MEDIAN(warm), "
+         "up = COUNT(*) WHERE change AND coldchain.parameter.value.new > coldchain.parameter.value.old, "
+         "down = COUNT(*) WHERE change AND coldchain.parameter.value.new < coldchain.parameter.value.old "
          "BY t = BUCKET(@timestamp, 5 minutes), retail.store.id "
-         "| STATS hottest = ROUND(MAX(typical), 1), coolest = ROUND(MIN(typical), 1), changes = SUM(chg) BY t | SORT t")
-    cfg = {"type": "xy", "layers": [{"type": "line", "data_source": esql(q), "x": {"column": "t"},
-                                     "y": [{"column": "hottest"}, {"column": "coolest"},
-                                           {"column": "changes", "axis": "y2", "color": {"type": "static", "color": RED}}]}],
+         "| STATS hottest = ROUND(MAX(typical), 1), coolest = ROUND(MIN(typical), 1), "
+         "warming = SUM(up), cooling = SUM(down) BY t | SORT t")
+    cfg = {"type": "xy",
+           "layers": [{"type": "bar_stacked", "data_source": esql(q), "x": {"column": "t"},
+                       "y": [{"column": "warming", "axis": "y2", "color": {"type": "static", "color": RED}},
+                             {"column": "cooling", "axis": "y2", "color": {"type": "static", "color": "#6092C0"}}]},
+                      {"type": "line", "data_source": esql(q), "x": {"column": "t"},
+                       "y": [{"column": "hottest"}, {"column": "coolest"}]}],
            "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "K above nominal", "visible": True}},
-                    "y2": {"title": {"text": "parameter changes per 5 minutes", "visible": True}}},
+                    "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
     d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and parameter changes", cfg, 48, 12,
           query=q)
