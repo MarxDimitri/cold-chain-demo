@@ -92,6 +92,8 @@ def nav_panel(dash_id: str) -> dict | None:
     dash_id = {panels.LIT_PAGE: panels.DARK_PAGE}.get(dash_id, dash_id)  # "the light is on" is Act 0 with the light on
     if dash_id.startswith("coldchain-act1a-s07-"):  # a clicked cabinet is still Act 1
         dash_id = "coldchain-act1a-cabinet"
+    if dash_id.startswith("coldchain-act1b-s"):  # a clicked store is still Act 2
+        dash_id = "coldchain-act1b-estate"
     if dash_id not in ids:
         return None
     i = ids.index(dash_id)
@@ -320,14 +322,14 @@ def store_map_query() -> str:
             f'| EVAL x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "") | SORT store')
 
 
-def estate_tiles_query() -> str:
+def estate_tiles_query(store: str | None = None) -> str:
     """Four values, each looked up against its normal in kb-baselines; the stripe colour comes from the same thresholds as before."""
     from .baselines import THRESHOLDS as th
 
     def state(key: str, v: str = "value") -> str:
         x = th[key]
         if x["direction"] == "down":
-            return f'CASE({v} < {x["red_below"]}, "red", "green")'
+            return f'CASE({v} < {x["red_below"] // (20 if store else 1)}, "red", "green")'
         if key == "cabinets-warm":  # stores, not cabinets: any alert is red
             return f'CASE({v} >= 1, "red", "green")'
         if "amber" in x:
@@ -336,41 +338,47 @@ def estate_tiles_query() -> str:
 
     # Rule 2 ("warm for too long, no defrost") judges the last minutes of the data, so a cabinet that was warm and has been restored
     # reads zero there; its alert stays. The tile counts the stores that rule 2 alerted on in the window.
-    warm = (f'FROM .alerts-security.alerts-default | WHERE {T} AND kibana.alert.rule.name LIKE "*warm for too long*" '
+    sf = f' AND retail.store.id == "{store}"' if store else ""  # one store: every tile is filtered to it
+    af = f' AND kibana.alert.suppression.terms.value == "{store}"' if store else ""
+    warm = (f'FROM .alerts-security.alerts-default | WHERE {T}{af} AND kibana.alert.rule.name LIKE "*warm for too long*" '
             "| STATS value = COUNT_DISTINCT(kibana.alert.suppression.terms.value)")
     parts = [
         (1, "parameter-changes", "Parameter changes",
-         f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" | STATS value = COUNT(*)'),
+         f'FROM logs-coldchain.audit-* | WHERE {T}{sf} AND event.action == "parameter-change" | STATS value = COUNT(*)'),
         (2, "cabinets-reporting", "Cabinets reporting",
-         f"FROM metrics-coldchain.case-* | WHERE {T} | STATS value = COUNT_DISTINCT(device.id)"),
+         f"FROM metrics-coldchain.case-* | WHERE {T}{sf} | STATS value = COUNT_DISTINCT(device.id)"),
         (3, "cabinets-warm", "Stores alerted: warm, no defrost", warm),
-        (4, "open-alerts", "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T} | STATS value = COUNT(*)"),
+        (4, "open-alerts", "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T}{af} | STATS value = COUNT(*)"),
     ]
     union = ", ".join(f'({q} | EVAL ord = {o}, key = "{k}", label = "{lab}")' for o, k, lab, q in parts)
     states = ", ".join(f'key == "{k}", {state(k)}' for _, k, _, _ in parts)
     return (f"FROM {union} | EVAL kb.key = key | LOOKUP JOIN kb-baselines ON kb.key "
             '| EVAL normal = ROUND(CASE(key == "parameter-changes", kb.baseline.value * DATE_DIFF("minutes", ?_tstart, ?_tend) / 1440.0, '
-            "kb.baseline.value), 0) "
+            f"kb.baseline.value) / {20 if store else 1}, 0) "  # the baselines are for the estate: a store is a twentieth
             f"| EVAL delta = TO_INTEGER(value - normal), normal = TO_INTEGER(normal), state = CASE({states}, \"green\") "
             "| SORT ord | KEEP ord, label, value, normal, delta, state")
 
 
-def act1() -> Dash:
-    d = Dash("coldchain-act1b-estate", "Act 2: The same blip across the whole estate, not on SOC's radar",
+def act1(store: str | None = None) -> Dash:
+    """Act 2. With STORE the whole page is filtered to that store (a dot of the map links to it); without, the estate."""
+    town = STORE_GEO[store][2] if store else ""
+    d = Dash("coldchain-act1b-estate" if not store else f"coldchain-act1b-{store.lower()}",
+             "Act 2: The same blip across the whole estate, not on SOC's radar" + (f" ({store} {town})" if store else ""),
              "Synthetic data, fictional chain: 20 stores, 480 cabinets. Central IT's view.")
+    sf = f' AND retail.store.id == "{store}"' if store else ""
     # Left: the schematic map of the stores. Right: the four tiles, then the chart.
-    custom(d, "Twenty stores on the map", store_map_query(), panels.STORE_MAP, w=20, h=28, show_title=False)
-    custom(d, "Estate tiles", estate_tiles_query(), panels.ESTATE_TILES, w=28, h=8, x=20, show_title=False)
+    custom(d, "Twenty stores on the map", store_map_query(), panels.store_map(store, town), w=20, h=28, show_title=False)
+    custom(d, "Estate tiles", estate_tiles_query(store), panels.ESTATE_TILES, w=28, h=8, x=20, show_title=False)
     d.row(8)
     # One native chart (brush a time range to zoom, as in any Kibana chart): hottest and coolest store (median cabinet) as lines, the
     # setpoint changes as vertical bars on the right axis, raised (warming) red and lowered (cooling) blue, stacked.
-    q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
+    q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T}{sf} AND @timestamp <= NOW() "
          f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL}, "
          'change = event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" '
          "| STATS typical = MEDIAN(warm), "
          "up = COUNT(*) WHERE change AND coldchain.parameter.value.new > coldchain.parameter.value.old, "
          "down = COUNT(*) WHERE change AND coldchain.parameter.value.new < coldchain.parameter.value.old "
-         "BY t = BUCKET(@timestamp, 5 minutes), retail.store.id "
+         f"BY t = BUCKET(@timestamp, 5 minutes), unit = {'device.id' if store else 'retail.store.id'} "  # a store: hottest and coolest cabinet
          "| STATS hottest = ROUND(MAX(typical), 1), coolest = ROUND(MIN(typical), 1), "
          "warming = SUM(up), cooling = SUM(down) BY t | SORT t")
     cfg = {"type": "xy",
@@ -380,13 +388,13 @@ def act1() -> Dash:
                       {"type": "line", "data_source": esql(q), "x": {"column": "t"},
                        "y": [{"column": "hottest", "color": {"type": "static", "color": "#E7664C"}},
                              {"column": "coolest", "color": {"type": "static", "color": "#00BFB3"}}]}],
-           "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": "K above nominal (hottest and coolest store)", "visible": True}},
+           "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": f"K above nominal (hottest and coolest {'cabinet' if store else 'store'})", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
     d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 20, x=20, query=q)
     # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
     # next to the 46 changes and the 46 restores.
-    tbl = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action IN ("logged-in", "parameter-change") '
+    tbl = (f'FROM logs-coldchain.audit-* | WHERE {T}{sf} AND event.action IN ("logged-in", "parameter-change") '
            '| EVAL what = CASE(event.action == "logged-in", "logged in", '
            'CONCAT("setpoint ", TO_STRING(coldchain.parameter.value.old), " -> ", TO_STRING(coldchain.parameter.value.new))), '
            "src = TO_STRING(source.ip) "
@@ -508,6 +516,9 @@ def hunt() -> Dash:
 # Ids are listed, not read from the builders.
 DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act0-lit": act0_lit, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
               "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos}
+# one Act 2 page per store, opened by clicking its dot on the map
+for _s in STORE_GEO:
+    DASHBOARDS[f"coldchain-act1b-{_s.lower()}"] = (lambda s=_s: act1(s))
 # one Act 1 page per other cabinet of store 07, opened by clicking its number in the layout
 for _n in range(1, 25):
     _cab = f"S07-C{_n:02d}"

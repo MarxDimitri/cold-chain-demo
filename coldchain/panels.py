@@ -184,7 +184,7 @@ ESTATE_TILES = BASE_CSS + """
 
 # Act 2: a map of the 20 stores. The base map (borders, regions, the Rhine) is real vector data from Natural Earth, baked into SVG paths
 # (coldchain/mapdata.py): custom panels cannot load map tiles. Rows: store, attacked, warm, x, y, town.
-def store_map() -> str:
+def store_map(selected: str | None = None, town: str = "") -> str:
     from .mapdata import COUNTRIES, REGIONS, RIVERS, VIEWBOX
     w, h = VIEWBOX
     land = {"France": "#6092C0", "Germany": "#F5A700", "Switzerland": "#9170B8"}
@@ -194,12 +194,22 @@ def store_map() -> str:
                       for d in REGIONS.values())
     rivers = "".join(f'<path d="{d}" fill="none" stroke="#6092C0" stroke-opacity=".8" stroke-width="{4 if n in ("Rhin", "Rhine") else 1.6}" '
                      'stroke-linecap="round" stroke-linejoin="round"/>' for n, d in RIVERS.items())
-    return STORE_MAP_TPL.replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 34)))
+    if selected:
+        head = (f'<div class="zbar"><b>{selected} {town}</b> <span class="muted">the whole page shows this store</span>'
+                '<a href="/app/dashboards#/view/coldchain-act1b-estate">All stores</a></div>')
+    else:
+        head = '<div class="zbar"><span class="muted">Click a store to filter the page to it.</span></div>'
+    return (STORE_MAP_TPL.replace("@@HEAD@@", head).replace("@@SEL@@", selected or "-").replace("@@W@@", str(w / 100)).replace("@@H@@", str(h / 100))
+            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 34))))
 
 
 STORE_MAP_TPL = BASE_CSS + """
 <style>
-.cc .map{max-width:600px;margin:0 auto}
+.cc .map{max-width:600px;margin:0 auto;position:relative}
+.cc .zbar{font-size:13px;margin:0 8px 6px 8px;display:flex;gap:14px;align-items:center}
+.cc .zbar a{color:#0B64DD;text-decoration:underline}
+.cc a.sd{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;display:block;cursor:pointer}
+.cc a.sd:hover{outline:3px solid #0B64DD}
 .cc .map svg{display:block}
 .cc .dot{cursor:default}
 .cc .dot:hover circle{stroke-width:4}
@@ -209,7 +219,7 @@ STORE_MAP_TPL = BASE_CSS + """
 }
 .cc .pulse{animation:ccpulse 1.8s ease-out infinite}
 </style>
-<div class="cc"><div class="map">
+<div class="cc">@@HEAD@@<div class="map">
 <svg viewBox="@@VB@@" width="100%" role="img" aria-label="The 20 stores on the Upper Rhine">
   @@BASE@@
   <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
@@ -219,6 +229,7 @@ STORE_MAP_TPL = BASE_CSS + """
   <text x="14" y="640" font-size="13" font-weight="700" fill="#9170B8" opacity=".8" letter-spacing="2">SWITZERLAND</text>
   {% for row in rows %}
   <g class="dot">
+    {% if row["store"].value == "@@SEL@@" %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="18" fill="none" stroke="currentColor" stroke-width="3"/>{% endif %}
     {% if row["attacked"].value > 0 %}<circle class="pulse" cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" fill="#BD271E"/>{% endif %}
     <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="11" stroke="#fff" stroke-width="2.5"
       fill="{% if row["attacked"].value > 0 %}#BD271E{% elsif row["warm"].value > 0 %}#F5A700{% else %}#54B399{% endif %}">
@@ -230,7 +241,12 @@ STORE_MAP_TPL = BASE_CSS + """
     <circle cx="110" cy="@@LEGY@@" r="7" fill="#BD271E"/><text x="124" y="@@LEGY@@" dy="4">setpoints raised</text>
     <circle cx="260" cy="@@LEGY@@" r="7" fill="#F5A700"/><text x="274" y="@@LEGY@@" dy="4">warm, no defrost</text></g>
   <text x="490" y="670" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot for the town.</text>
-</svg></div></div>
+</svg>
+  {% for row in rows %}
+  <a class="sd" style="left:{{ row["x"].value | divided_by: @@W@@ }}%;top:{{ row["y"].value | divided_by: @@H@@ }}%" title="Filter to {{ row["store"].value }} {{ row["town"].value }}"
+     href="/app/dashboards#/view/coldchain-act1b-{{ row["store"].value | downcase }}"></a>
+  {% endfor %}
+</div></div>
 """
 
 
