@@ -193,9 +193,9 @@ def act0() -> Dash:
              "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
              time=("now-24h", "now"))
     q = ("FROM kb-sources | SORT tier_order, rows DESC "
-         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, label, what, rows_txt, days")
-    custom(d, "The realms", q, panels.REALMS, w=48, h=36, show_title=False)
-    d.row(36)
+         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, zone, label, what, rows_txt")
+    custom(d, "The realms", q, panels.REALMS, w=48, h=50, show_title=False)
+    d.row(50)
     return d
 
 

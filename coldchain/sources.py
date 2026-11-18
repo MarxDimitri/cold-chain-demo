@@ -17,6 +17,8 @@ from .elastic import client
 
 SECURITY, OBSERVABILITY, KB = "Security realm", "Observability realm", "Knowledge base realm"
 TIER_ORDER = {SECURITY: 1, OBSERVABILITY: 2, KB: 3}
+# What a SOC already looks at: its alerts, and what the hunting agent adds. Every other source is in the dark.
+LIT = {".alerts-security.alerts-default", "cc-hunt-findings"}
 
 # (source as written after FROM, tier, what it holds, has a time field)
 SOURCES: list[tuple[str, str, str, bool]] = [
@@ -73,7 +75,7 @@ def catalog(es) -> list[dict]:
         days = None
         if first and last:
             days = max(1, round((datetime.fromisoformat(last.replace("Z", "+00:00")) - datetime.fromisoformat(first.replace("Z", "+00:00"))).total_seconds() / 86400))
-        rows.append({"source": src, "label": LABELS[src], "tier": tier, "tier_order": TIER_ORDER[tier], "what": what, "ask_with": f"FROM {src}",
+        rows.append({"source": src, "label": LABELS[src], "zone": "lit" if src in LIT else "dark", "tier": tier, "tier_order": TIER_ORDER[tier], "what": what, "ask_with": f"FROM {src}",
                      "rows": n, "first_seen": first, "last_seen": last, "days": days, "measured_at": now})
         print(f"  {src:36} {n:>12,} rows", flush=True)
     return rows
@@ -85,7 +87,7 @@ def load(es, rows: list[dict]) -> None:
         es.indices.delete(index=index)
     keyword = {"type": "keyword"}
     es.indices.create(index=index, settings={"index.mode": "lookup"}, mappings={"properties": {
-        "measured_at": {"type": "date"}, "source": keyword, "label": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword,
+        "measured_at": {"type": "date"}, "source": keyword, "label": keyword, "zone": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword,
         "ask_with": keyword, "rows": {"type": "long"}, "first_seen": {"type": "date"}, "last_seen": {"type": "date"},
         "days": {"type": "integer"}}})
     helpers.bulk(es, ({"_index": index, "_source": r} for r in rows), refresh="wait_for")
