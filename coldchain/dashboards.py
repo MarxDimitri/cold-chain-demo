@@ -157,6 +157,10 @@ def lines(d: Dash, title: str, q: str, x_col: str, y_cols: list[str], w: int = 4
     d.add(title, cfg, w, h, x, query=q, params=params)
 
 
+# ES|QL has no number formatting: put thousands separators in with a regular expression (lookahead for groups of three digits).
+THOUSANDS = r'REPLACE(TO_STRING({col}), "(\\d)(?=(\\d{{3}})+$)", "$1,")'
+
+
 def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10, x: int = 0) -> None:
     """A Serverless custom panel (`custom_content`): one ES|QL query, filled into an HTML, CSS and Liquid template."""
     d.panels.append({"type": "custom_content", "grid": {"x": x, "y": d.y, "w": w, "h": h},
@@ -170,7 +174,8 @@ def act0() -> Dash:
     d = Dash("coldchain-act0-sources", "CC Act 0: The realms you usually do not watch",
              "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
              time=("now-24h", "now"))
-    q = "FROM kb-sources | SORT tier_order, rows DESC | KEEP tier, label, what, rows, days"
+    q = ("FROM kb-sources | SORT tier_order, rows DESC "
+         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, label, what, rows_txt, days")
     custom(d, "The streetlight effect: we search where the light is", q, panels.REALMS, w=48, h=22)
     d.row(22)
     return d

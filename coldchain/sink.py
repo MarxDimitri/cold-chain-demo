@@ -8,7 +8,9 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import threading
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -34,9 +36,16 @@ class LocalSink:
         self.files += 1
         self.bytes += len(body)
 
+    def wait(self) -> None:
+        """Nothing to wait for: local writes are synchronous."""
+
 
 class S3Sink:
-    """Each store writes with its own write-only credentials (COLDCHAIN_STORE_KEYS_FILE)."""
+    """Each store writes with its own write-only credentials (COLDCHAIN_STORE_KEYS_FILE).
+
+    Uploads run in a thread pool (a PUT takes 0.1 to 0.5 s from a laptop, and a pre-roll is thousands of small files); call
+    `wait()` before relying on the objects being there.
+    """
 
     def __init__(self, bucket: str, region: str, keys_file: str | None = None, resume: bool = False):
         import boto3  # imported lazily so local runs don't need AWS
@@ -55,28 +64,43 @@ class S3Sink:
         self.keys = json.loads(Path(keys_file).read_text()) if keys_file and Path(keys_file).exists() else {}
         self._boto3 = boto3
         self._clients: dict[str, object] = {}
+        self._lock = threading.Lock()
+        self._pool = ThreadPoolExecutor(max_workers=int(os.environ.get("COLDCHAIN_UPLOAD_THREADS", "16")))
+        self._pending: list = []
         self.files = 0
         self.bytes = 0
 
     def _client(self, store: str):
-        if store not in self._clients:
-            cred = self.keys.get(store)
-            kwargs = {"region_name": self.region, "config": self._config}
-            if cred:
-                kwargs |= {"aws_access_key_id": cred["access_key_id"],
-                           "aws_secret_access_key": cred["secret_access_key"]}
-            self._clients[store] = self._boto3.client("s3", **kwargs)
-        return self._clients[store]
+        with self._lock:
+            if store not in self._clients:
+                cred = self.keys.get(store)
+                kwargs = {"region_name": self.region, "config": self._config}
+                if cred:
+                    kwargs |= {"aws_access_key_id": cred["access_key_id"],
+                               "aws_secret_access_key": cred["secret_access_key"]}
+                self._clients[store] = self._boto3.client("s3", **kwargs)
+            return self._clients[store]
 
     def put(self, key: str, store: str, body: bytes) -> None:
         if key in self.existing:
             self.skipped += 1
             return
-        self._client(store).put_object(Bucket=self.bucket, Key=key, Body=body,
-                                       ContentType="application/x-ndjson",
-                                       ContentEncoding="gzip")
-        self.files += 1
-        self.bytes += len(body)
+        client = self._client(store)
+
+        def upload() -> None:
+            client.put_object(Bucket=self.bucket, Key=key, Body=body, ContentType="application/x-ndjson", ContentEncoding="gzip")
+            with self._lock:
+                self.files += 1
+                self.bytes += len(body)
+        self._pending.append(self._pool.submit(upload))
+        if len(self._pending) >= 2000:  # bound the memory held by queued bodies
+            self.wait()
+
+    def wait(self) -> None:
+        """Wait for every queued upload; raise the first error."""
+        pending, self._pending = self._pending, []
+        for f in pending:
+            f.result()
 
 
 def make_sink(target: str, out: str = "out", resume: bool = False):

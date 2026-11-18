@@ -96,6 +96,7 @@ def preroll(hours: float, seed: int = 42, timeout: int = 900) -> None:
         # whole 5-minute windows up to the next boundary: the replay's own flows start at the first boundary at or after END
         _, summary = flows(chain, store, f_epoch, (-(-end // 300) * 300 - f_epoch) / 86400, seed)
         write_records(sink, "detect", "netflow.summary", store.id, summary, ROTATION)
+        sink.wait()
     print(f"preroll: {sink.files} files, {sink.bytes / 1e6:.1f} MB written in {time.time() - started:.0f} s; waiting for the collector",
           flush=True)
 

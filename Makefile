@@ -189,13 +189,13 @@ clean-raw:
 hunt-clear:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.hunt clear
 
-# Everything a run leaves behind: indexed data, alerts and hunt findings, and (listed, deleted with DELETE=1) bucket objects of the run.
+# Everything a run leaves behind in Elasticsearch: indexed data, alerts and hunt findings. (The run's small files stay in the bucket,
+# nothing reads them again.)
 # SINCE is the replay's start (T0 minus 3 minutes; the run prints it): after the pre-roll, so the day of context stays.
 reset-demo:
 	@test -n "$(SINCE)" || (echo "usage: make reset-demo SINCE=<replay start, printed by the run> [DELETE=1]"; exit 1)
 	$(MAKE) clean-run SINCE=$(SINCE)
 	$(MAKE) hunt-clear
-	$(MAKE) clean-raw SINCE=$(SINCE) $(if $(DELETE),DELETE=1)
 	$(MAKE) sources
 
 # Removes what the repo created: the hunt, the collector and the AWS stack (bucket versions included).

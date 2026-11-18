@@ -146,11 +146,13 @@ class Replay:
         for (dataset, store), lines in self.detect.items():
             write_chunk(self.sink, "detect", dataset, store, minute, lines)
         self.detect.clear()
+        self.sink.wait()
 
     def finish(self) -> None:
         for (dataset, store), recs in self.raw.items():
             write_records(self.sink, "raw", dataset, store, recs, 60)
         self.raw.clear()
+        self.sink.wait()
 
     # --- main loop ------------------------------------------------------------------------
 

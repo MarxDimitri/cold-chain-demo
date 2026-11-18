@@ -241,6 +241,7 @@ def main(argv: list[str] | None = None) -> None:
             pos5, 300, [("host", "cpu", "usage"), ("coldchain", "pos", "disk_free_pct"), ("coldchain", "pos", "tx_per_min")]), 60)
         if store.id == config()["store"]:
             counts["tls"] = write_records(sink, "detect", "network_traffic.tls", store.id, tls, 60)
+        sink.wait()
         print(f"{store.id}: {counts} in {time.time() - started:.1f}s", flush=True)
     print(f"done: {sink.files} files, {sink.bytes / 1e6:.1f} MB"
           + (f", {sink.skipped} already present" if getattr(sink, "skipped", 0) else ""))

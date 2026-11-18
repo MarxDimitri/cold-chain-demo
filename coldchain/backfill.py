@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> None:
             f_epoch = int(d_start.timestamp()) // 300 * 300
             _, summary = flows(chain, store, f_epoch, args.detect_days, args.seed)
             counts["flows summary"] = write_records(sink, "detect", "netflow.summary", store.id, summary, args.detect_rotation)
+        sink.wait()
         print(f"{store.id}: {counts} in {time.time() - started:.1f}s", flush=True)
 
     print(f"done: {sink.files} files, {sink.bytes / 1e6:.1f} MB"

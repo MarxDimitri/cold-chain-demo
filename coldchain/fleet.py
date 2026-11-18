@@ -51,7 +51,7 @@ def integration_body(policy_id: str, env: dict[str, str], cred: dict[str, str]) 
         "queue_url": env["COLDCHAIN_DETECT_QUEUE_URL"],
         "data_stream.dataset": INGEST_DATASET,
         "pipeline": PIPELINE,
-        "number_of_workers": 5,
+        "number_of_workers": 15,
         "max_number_of_messages": 10,
         "parsers": '- ndjson:\n    target: ""\n    add_error_key: true\n',
         "tags": ["forwarded"],

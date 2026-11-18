@@ -19,21 +19,23 @@ BASE_CSS = """
 """
 
 LAMP_SVG = """
-<svg viewBox="0 0 250 300" width="100%" style="max-width:300px" role="img" aria-label="A streetlight">
+<svg viewBox="0 0 260 372" width="100%" style="max-width:300px" role="img" aria-label="A streetlight">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F5A700" stop-opacity=".75"/><stop offset="1" stop-color="#F5A700" stop-opacity=".08"/>
+      <stop offset="0" stop-color="#F5A700" stop-opacity=".8"/><stop offset="1" stop-color="#F5A700" stop-opacity=".1"/>
     </linearGradient>
   </defs>
-  <polygon points="115,66 135,66 215,270 35,270" fill="url(#beam)"/>
-  <ellipse cx="125" cy="272" rx="92" ry="12" fill="#F5A700" fill-opacity=".25"/>
-  <rect x="121" y="50" width="8" height="222" rx="3" fill="#69707D"/>
-  <path d="M121 56 Q121 22 160 20" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <rect x="112" y="46" width="42" height="16" rx="6" fill="#343741"/>
-  <ellipse cx="133" cy="66" rx="13" ry="5" fill="#FFE9A8"/>
-  <text x="125" y="226" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">endpoints, firewalls, identity</text>
-  <text x="125" y="244" text-anchor="middle" font-size="11" fill="currentColor" opacity=".75">what you usually watch</text>
-  <text x="8" y="294" font-size="11" fill="currentColor" opacity=".8">in the dark: the cold chain, the POS, a year of history</text>
+  <text x="130" y="16" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">what you usually watch:</text>
+  <text x="130" y="33" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">endpoints, firewalls, identity</text>
+  <polygon points="118,98 142,98 236,296 24,296" fill="url(#beam)"/>
+  <ellipse cx="130" cy="298" rx="110" ry="12" fill="#F5A700" fill-opacity=".28"/>
+  <rect x="126" y="76" width="8" height="222" rx="3" fill="#69707D"/>
+  <path d="M126 82 Q126 52 168 50" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <rect x="136" y="76" width="44" height="16" rx="6" fill="#343741" transform="translate(-6 -12)"/>
+  <ellipse cx="136" cy="94" rx="15" ry="5" fill="#FFE9A8"/>
+  <text x="130" y="326" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">in the dark:</text>
+  <text x="130" y="343" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">the cold chain, the POS,</text>
+  <text x="130" y="360" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">a year of history</text>
 </svg>
 """
 
@@ -51,7 +53,7 @@ REALMS = BASE_CSS + """
 <div class="card" style="border-left-color:{% if row["tier"].value == "Live data" %}#6092C0{% elsif row["tier"].value == "Knowledge base" %}#F5A700{% else %}#D36086{% endif %}">
   <div class="muted">{{ row["tier"].value }}</div>
   <b>{{ row["label"].value }}</b>
-  <div class="num">{{ row["rows"].value }}</div>
+  <div class="num">{{ row["rows_txt"].value }}</div>
   <div class="muted">{{ row["what"].value }}</div>
 </div>
 {% endfor %}
