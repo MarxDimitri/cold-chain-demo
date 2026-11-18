@@ -346,7 +346,15 @@ def act1() -> Dash:
            '| EVAL line = CONCAT(store, " (", TO_STRING(n), ") ", cabs, " by ", by_user, " from ", from_ip) '
            '| STATS total = SUM(n), detail = MV_CONCAT(MV_SORT(VALUES(line)), " | ") BY t, dir '
            f'| EVAL kind = "ev", x = {x}, when = DATE_FORMAT("MM-dd HH:mm", t) | KEEP kind, t, x, dir, total, detail, when)')
-    q = (f"FROM {pts}, {evs} "
+    # 16 time slices over the plot: a click zooms the dashboard to that slice (a link with the time range; custom panels cannot brush).
+    n = 16
+    sls = ("(FROM kb-assets | LIMIT 1 | EVAL i = [" + ",".join(str(k) for k in range(n)) + "] | MV_EXPAND i "
+           f'| EVAL span = TO_LONG(?_tend) - TO_LONG(?_tstart), a = TO_LONG(?_tstart) + i * span / {n}, b = TO_LONG(?_tstart) + (i + 1) * span / {n}, '
+           f'kind = "sl", sx = ROUND(90 + i * 1690.0 / {n}, 1), sw = ROUND(1690.0 / {n}, 1), '
+           'a_iso = TO_STRING(TO_DATETIME(a)), b_iso = TO_STRING(TO_DATETIME(b)), '
+           'a_lbl = DATE_FORMAT("MM-dd HH:mm", TO_DATETIME(a)), b_lbl = DATE_FORMAT("MM-dd HH:mm", TO_DATETIME(b)) '
+           "| KEEP kind, sx, sw, a_iso, b_iso, a_lbl, b_lbl)")
+    q = (f"FROM {pts}, {evs}, {sls} "
          '| EVAL from_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tend) | SORT kind, t')
     custom(d, "The estate warms as the setpoints change", q, panels.ESTATE_CHART, w=48, h=21, show_title=False)
     d.row(21)

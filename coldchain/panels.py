@@ -189,7 +189,11 @@ ESTATE_CHART = BASE_CSS + """
 <style>
 .cc .ch{position:relative;line-height:0}
 .cc .ch svg{display:block}
-.cc .hv{position:absolute;top:0;height:82%;width:16px;margin-left:-8px;line-height:1.35}
+.cc .hv{position:absolute;top:0;height:82%;width:16px;margin-left:-8px;line-height:1.35;z-index:2}
+.cc .sl{position:absolute;top:0;height:82%;display:block;z-index:1;cursor:zoom-in}
+.cc .sl:hover{background:rgba(96,146,192,.14);outline:1px dashed rgba(96,146,192,.8)}
+.cc .zbar{font-size:12px;line-height:1.4;margin:0 8px 4px 8px;display:flex;gap:16px;align-items:center}
+.cc .zbar a{color:#0B64DD;text-decoration:underline}
 .cc .hv .tip{display:none;position:absolute;top:14%;left:14px;width:420px;padding:10px 12px;border-radius:8px;z-index:20;
   background:#1d1e24;color:#f2f4f8;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.35);text-align:left}
 .cc .hv.left .tip{left:auto;right:14px}
@@ -208,7 +212,8 @@ ESTATE_CHART = BASE_CSS + """
   {% assign px = row["x"].value %}{% assign y0 = row["y0"].value %}{% assign top = row["top"].value %}{% assign bot = row["bot"].value %}
 {% endif %}{% assign fl = row["from_lbl"].value %}{% assign tl = row["to_lbl"].value %}{% endfor %}
 {% assign hot_segs = hot | split: "|" %}{% assign cool_segs = cool | split: "|" %}
-<div class="cc"><div class="ch">
+<div class="cc"><div class="zbar"><span class="muted">Click a time slice of the chart to zoom in (or use the time picker above).</span><a href="/app/dashboards#/view/coldchain-act1b-estate?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-24h,to:now))">Reset to the last 24 hours</a></div>
+<div class="ch">
 <svg viewBox="0 0 1800 500" width="100%" role="img" aria-label="Hottest and coolest store with the setpoint changes">
   <g stroke="currentColor" opacity=".18"><line x1="90" y1="60" x2="1780" y2="60"/><line x1="90" y1="230" x2="1780" y2="230"/><line x1="90" y1="400" x2="1780" y2="400"/>
     <line x1="513" y1="60" x2="513" y2="400"/><line x1="935" y1="60" x2="935" y2="400"/><line x1="1358" y1="60" x2="1358" y2="400"/></g>
@@ -229,6 +234,9 @@ ESTATE_CHART = BASE_CSS + """
     <line x1="720" y1="462" x2="720" y2="486" stroke="#6092C0" stroke-width="4"/><text x="732" y="479">setpoint lowered (cooling)</text>
     <text x="1000" y="479" opacity=".7">hover a red or blue line for the stores and cabinets</text></g>
 </svg>
+{% for row in rows %}{% if row["kind"].value == "sl" %}
+<a class="sl" style="left:{{ row["sx"].value | divided_by: 18.0 }}%;width:{{ row["sw"].value | divided_by: 18.0 }}%" title="Zoom to {{ row["a_lbl"].value }} - {{ row["b_lbl"].value }} UTC" href="/app/dashboards#/view/coldchain-act1b-estate?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:'{{ row["a_iso"].value }}',to:'{{ row["b_iso"].value }}'))"></a>
+{% endif %}{% endfor %}
 {% for row in rows %}{% if row["kind"].value == "ev" %}
 <div class="hv{% if row["x"].value > 1000 %} left{% endif %}" style="left:{{ row["x"].value | divided_by: 18.0 }}%">
   <div class="tip"><b class="{{ row["dir"].value }}">{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}</b>
