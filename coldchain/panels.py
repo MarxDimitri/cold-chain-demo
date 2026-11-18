@@ -34,7 +34,7 @@ def _lamp_svg(lit: bool) -> str:
            '<polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>'
     ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
     cap = ("in the light", "everything in the light", "in the light") if lit else \
-          ("in the dark", "the crown jewels in the light, the rest in the dark", "in the dark")
+          ("in the dark", "crown jewels in the light", "in the dark")
     def label(cx: float, title: str, sub: str, pill: bool, anchor: str = "middle") -> str:
         """A realm label at the top of its zone. A yellow pill (dark text) reads on any theme; on dark grey the text is light."""
         x = cx - 100 if anchor == "middle" else cx
