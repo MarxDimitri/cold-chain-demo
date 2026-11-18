@@ -182,11 +182,24 @@ ESTATE_TILES = BASE_CSS + """
 """
 
 
-# Act 2: a schematic map of the 20 stores (no tiles: custom panels load nothing external). Rows: store, attacked, warm, x, y, town.
-# x = (lon - 6.9) * 293 and y = (49.1 - lat) * 437.5 for the town of each store (config/chain.yaml); the Rhine is a rough line.
-STORE_MAP = BASE_CSS + """
+# Act 2: a map of the 20 stores. The base map (borders, regions, the Rhine) is real vector data from Natural Earth, baked into SVG paths
+# (coldchain/mapdata.py): custom panels cannot load map tiles. Rows: store, attacked, warm, x, y, town.
+def store_map() -> str:
+    from .mapdata import COUNTRIES, REGIONS, RIVERS, VIEWBOX
+    w, h = VIEWBOX
+    land = {"France": "#6092C0", "Germany": "#F5A700", "Switzerland": "#9170B8"}
+    countries = "".join(f'<path d="{d}" fill="{land[n]}" fill-opacity=".10" stroke="currentColor" stroke-opacity=".55" stroke-width="1.6"/>'
+                        for n, d in COUNTRIES.items())
+    regions = "".join(f'<path d="{d}" fill="none" stroke="currentColor" stroke-opacity=".28" stroke-width="1" stroke-dasharray="4 3"/>'
+                      for d in REGIONS.values())
+    rivers = "".join(f'<path d="{d}" fill="none" stroke="#6092C0" stroke-opacity=".8" stroke-width="{4 if n in ("Rhin", "Rhine") else 1.6}" '
+                     'stroke-linecap="round" stroke-linejoin="round"/>' for n, d in RIVERS.items())
+    return STORE_MAP_TPL.replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 34)))
+
+
+STORE_MAP_TPL = BASE_CSS + """
 <style>
-.cc .map{max-width:560px;margin:0 auto}
+.cc .map{max-width:600px;margin:0 auto}
 .cc .map svg{display:block}
 .cc .dot{cursor:default}
 .cc .dot:hover circle{stroke-width:4}
@@ -197,26 +210,31 @@ STORE_MAP = BASE_CSS + """
 .cc .pulse{animation:ccpulse 1.8s ease-out infinite}
 </style>
 <div class="cc"><div class="map">
-<svg viewBox="0 0 500 700" width="100%" role="img" aria-label="The 20 stores on the Upper Rhine">
-  <path d="M202.2 673.7 L184.6 612.5 L196.3 546.9 L199.2 468.1 L222.7 393.7 L240.3 315.0 L263.7 253.7 L269.6 196.9 L301.8 140.0 L339.9 87.5 L375.0 52.5 L416.1 35.0" fill="none" stroke="#6092C0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/>
-  <text x="318" y="520" font-size="12" font-style="italic" fill="#6092C0" opacity=".9" transform="rotate(-78 318 520)">Rhine</text>
-  <text x="14" y="26" font-size="13" font-weight="700" fill="currentColor" opacity=".5" letter-spacing="2">FRANCE · ALSACE</text>
-  <text x="486" y="26" font-size="13" font-weight="700" fill="currentColor" opacity=".5" letter-spacing="2" text-anchor="end">GERMANY · BADEN</text>
+<svg viewBox="@@VB@@" width="100%" role="img" aria-label="The 20 stores on the Upper Rhine">
+  @@BASE@@
+  <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
+  <text x="14" y="46" font-size="11" fill="currentColor" opacity=".5">Alsace</text>
+  <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
+  <text x="490" y="46" font-size="11" fill="currentColor" opacity=".5" text-anchor="end">Baden</text>
+  <text x="14" y="640" font-size="13" font-weight="700" fill="#9170B8" opacity=".8" letter-spacing="2">SWITZERLAND</text>
   {% for row in rows %}
   <g class="dot">
     {% if row["attacked"].value > 0 %}<circle class="pulse" cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" fill="#BD271E"/>{% endif %}
-    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" stroke="#fff" stroke-width="2.5"
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="11" stroke="#fff" stroke-width="2.5"
       fill="{% if row["attacked"].value > 0 %}#BD271E{% elsif row["warm"].value > 0 %}#F5A700{% else %}#54B399{% endif %}">
       <title>{{ row["store"].value }} {{ row["town"].value }}: {% if row["attacked"].value > 0 %}{{ row["attacked"].value }} cabinets at +50 C{% else %}all cabinets normal{% endif %}</title></circle>
-    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 4 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>
+    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>
   </g>
   {% endfor %}
-  <g font-size="12" fill="currentColor"><circle cx="20" cy="652" r="7" fill="#54B399"/><text x="34" y="656">normal</text>
-    <circle cx="110" cy="652" r="7" fill="#BD271E"/><text x="124" y="656">setpoints raised</text>
-    <circle cx="260" cy="652" r="7" fill="#F5A700"/><text x="274" y="656">warm, no defrost</text>
-    <text x="20" y="686" opacity=".6" font-size="11">Schematic map, not to scale. Store numbers inside the dots; hover for the town.</text></g>
+  <g font-size="12" fill="currentColor"><circle cx="20" cy="@@LEGY@@" r="7" fill="#54B399"/><text x="34" y="@@LEGY@@" dy="4">normal</text>
+    <circle cx="110" cy="@@LEGY@@" r="7" fill="#BD271E"/><text x="124" y="@@LEGY@@" dy="4">setpoints raised</text>
+    <circle cx="260" cy="@@LEGY@@" r="7" fill="#F5A700"/><text x="274" y="@@LEGY@@" dy="4">warm, no defrost</text></g>
+  <text x="490" y="670" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot for the town.</text>
 </svg></div></div>
 """
+
+
+STORE_MAP = store_map()
 
 # Act 3: when the attacker's address first logged in to each store. Query: store, first_seen, days_ago, logins.
 FIRST_VISITS = BASE_CSS + """

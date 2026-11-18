@@ -309,8 +309,9 @@ STORE_GEO = {
 
 def store_map_query() -> str:
     """One row per store for the map: how many cabinets are at +50 or warm without defrost, plus the map position of its town."""
-    xs = ", ".join(f'store == "{k}", {round((v[0] - 6.9) * 293, 1)}' for k, v in STORE_GEO.items())
-    ys = ", ".join(f'store == "{k}", {round((49.1 - v[1]) * 437.5, 1)}' for k, v in STORE_GEO.items())
+    from . import mapdata
+    xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S, 1)}' for k, v in STORE_GEO.items())
+    ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S, 1)}' for k, v in STORE_GEO.items())
     towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
     return (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
             "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "

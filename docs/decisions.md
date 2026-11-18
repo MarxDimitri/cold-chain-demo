@@ -525,3 +525,12 @@ at 12:35 UTC was most likely the same bug. The Act 1 header is now the dashboard
 ## Act 0: the crown jewels as three tiles (2026-11-18)
 
 - The single "Endpoints, firewalls, identity" card is now three tiles under the light: **Endpoints** (EDR telemetry per host), **Firewalls** (border firewall and VPN logs) and **Identity** (sign-ins and directory changes). Their wording follows public guidance, not the demo's data (there is none for them): the ASD/ACSC "Priority logs for SIEM ingestion" ranks EDR first, then network devices, domain controllers and Active Directory logs, and for cloud identity the Microsoft unified audit and Entra sign-in logs; vendor guides call identity-provider authentication logs the highest-value single source, and note that bulk firewall allow logs often go to cheaper storage rather than the SIEM; Gartner's SOC visibility triad is endpoints (EDR), network (NDR) and logs (SIEM), with identity increasingly added. The point on stage: the covered realm is endpoints, firewalls and identity; flows, audit, TLS and the cold chain itself are in the dark.
+
+
+## Act 2 store map (2026-11-18)
+
+The Act 2 map is a custom panel: SVG paths clipped from Natural Earth 10m (public domain; `ne_10m_admin_0_countries`, `ne_10m_admin_1_states_provinces`,
+`ne_10m_rivers_lake_centerlines`, `ne_10m_lakes` from github.com/nvkelso/natural-earth-vector) for the Upper Rhine, stored in `coldchain/mapdata.py`.
+Custom panels cannot load tiles, and the dashboards API has no Maps panel, so the map has no zoom or pan. Store dots sit at the coordinates of their
+town (`STORE_GEO` in `coldchain/dashboards.py`, projection x = (lon - 6.8) * cos(48.3 deg) * 400, y = (49.15 - lat) * 400). To regenerate the paths,
+download the four files into one directory and run `python3 -I tools/build_map.py DATA_DIR OUT.json`, then write the result into `coldchain/mapdata.py`.
