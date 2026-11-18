@@ -18,42 +18,42 @@ BASE_CSS = """
 </style>
 """
 
-SEC, OBS, KBC = "#F04E98", "#00BFB3", "#FEC514"  # realm colours: Security, Observability, Knowledge base
+LIGHT, DARK, STRIPE_DARK = "#FEC514", "#14161b", "#69707D"  # yellow is the light, black is the dark
 
 LAMP_SVG = """
 <svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F04E98" stop-opacity=".85"/><stop offset="1" stop-color="#F04E98" stop-opacity=".12"/>
+      <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="330" height="150" rx="8" fill="#00BFB3" fill-opacity=".14"/>
-  <rect x="670" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".16"/>
-  <rect x="330" y="0" width="340" height="150" fill="#F04E98" fill-opacity=".07"/>
+  <rect x="0" y="0" width="330" height="150" rx="8" fill="#14161b"/>
+  <rect x="670" y="0" width="330" height="150" rx="8" fill="#14161b"/>
+  <rect x="330" y="0" width="340" height="150" fill="#FEC514" fill-opacity=".10"/>
   <polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>
   <rect x="496" y="46" width="8" height="104" rx="3" fill="#69707D"/>
   <path d="M496 52 Q496 26 536 24" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
   <rect x="518" y="14" width="44" height="16" rx="6" fill="#343741"/>
   <ellipse cx="540" cy="34" rx="15" ry="5" fill="#FFE9A8"/>
-  <g fill="#00BFB3" fill-opacity=".55"><rect x="34" y="86" width="38" height="52" rx="4"/><rect x="82" y="86" width="38" height="52" rx="4"/>
+  <g fill="#8C97A8" fill-opacity=".55"><rect x="34" y="86" width="38" height="52" rx="4"/><rect x="82" y="86" width="38" height="52" rx="4"/>
     <rect x="130" y="86" width="38" height="52" rx="4"/><rect x="178" y="86" width="38" height="52" rx="4"/><rect x="226" y="86" width="38" height="52" rx="4"/></g>
-  <text x="34" y="68" font-size="13" fill="currentColor" opacity=".8">cabinets, probes, POS terminals</text>
-  <g fill="#FEC514" fill-opacity=".7"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
+  <text x="34" y="68" font-size="13" fill="#c3c8d4">cabinets, probes, POS terminals</text>
+  <g fill="#8C97A8" fill-opacity=".55"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
     <rect x="720" y="130" width="130" height="14" rx="5"/></g>
-  <text x="720" y="68" font-size="13" fill="currentColor" opacity=".8">inventory, limits, profiles, manuals</text>
+  <text x="720" y="68" font-size="13" fill="#c3c8d4">inventory, limits, profiles, manuals</text>
   <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
-  <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#00857c">OBSERVABILITY REALM</text>
+  <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">OBSERVABILITY REALM</text>
   <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
-  <text x="500" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#C2327A">SECURITY REALM</text>
+  <text x="500" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">SECURITY REALM</text>
   <text x="500" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">the crown jewels in the light, the rest in the dark</text>
-  <text x="835" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#946b00">KNOWLEDGE BASE REALM</text>
+  <text x="835" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">KNOWLEDGE BASE REALM</text>
   <text x="835" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
 </svg>
 """
 
-# Act 0: the streetlight over three realms, and under each realm the sources it holds, lit or in the dark.
+# Act 0: the streetlight over three realms, and under each realm the sources it holds: yellow under the light, black in the dark.
 # Query: kb-sources (tier, zone, label, what, rows_txt).
-CARD = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}" style="border-left-color:REALM_COLOR">
+CARD = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}">
   <span class="zone">{% if row["zone"].value == "lit" %}under the light{% else %}in the dark{% endif %}</span>
   <b>{{ row["label"].value }}</b>
   <div class="num">{{ row["rows_txt"].value }}</div>
@@ -67,27 +67,27 @@ REALMS = BASE_CSS + """
 .cc-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .cc-sub{grid-column:1/-1;font-size:12px;font-weight:700;margin:6px 0 0 0;opacity:.85}
 .cc .card{position:relative}
-.cc .card.dark{background:#1b1d23;color:#e8eaf0;border-color:#3a3f4b}
-.cc .card.dark .muted{color:#c3c8d4;opacity:.85}
-.cc .card.dark .zone{color:#c3c8d4;opacity:.8}
-.cc .card.lit{background:rgba(240,78,152,.07)}
-.cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.65}
 .cc .card b{display:block;padding-right:70px}
+.cc .card.lit{background:rgba(254,197,20,.16);border-left-color:#FEC514}
+.cc .card.dark{background:#14161b;color:#e8eaf0;border-color:#2b2f38;border-left-color:#69707D}
+.cc .card.dark .muted{color:#c3c8d4;opacity:.85}
+.cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7}
+.cc .card.dark .zone{color:#c3c8d4}
 </style>
 <div class="cc">""" + LAMP_SVG + """
 <div class="cc-cols">
 <div class="cc-col"><div class="cc-cards">
-{% for row in rows %}{% if row["tier"].value == "Observability realm" %}""" + CARD.replace("REALM_COLOR", "#00BFB3") + """{% endif %}{% endfor %}
+{% for row in rows %}{% if row["tier"].value == "Observability realm" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>
 <div class="cc-col"><div class="cc-cards">
-<div class="card lit" style="grid-column:1/-1;border-left-color:#F04E98"><span class="zone">under the light</span><b>Endpoints, firewalls, identity</b>
+<div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Endpoints, firewalls, identity</b>
   <div class="muted">The crown jewels. Your SIEM and EDR already cover them: not part of this demo.</div></div>
-{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}""" + CARD.replace("REALM_COLOR", "#F04E98") + """{% endif %}{% endfor %}
+{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}""" + CARD + """{% endif %}{% endfor %}
 <div class="cc-sub">In the dark: security data the usual tools do not cover</div>
-{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}""" + CARD.replace("REALM_COLOR", "#F04E98") + """{% endif %}{% endfor %}
+{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>
 <div class="cc-col"><div class="cc-cards">
-{% for row in rows %}{% if row["tier"].value == "Knowledge base realm" %}""" + CARD.replace("REALM_COLOR", "#FEC514") + """{% endif %}{% endfor %}
+{% for row in rows %}{% if row["tier"].value == "Knowledge base realm" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>
 </div></div>
 """
