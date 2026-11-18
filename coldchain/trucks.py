@@ -167,9 +167,10 @@ def at_risk_query(keep: str = "") -> str:
     return (f'FROM ({store_trouble()} | EVAL kind = "store"), ({upcoming_stops()} | EVAL store = retail.store.id, kind = "delivery") '
             f'| INLINE STATS bad = MAX(bad_cabinets) BY store | WHERE kind == "delivery" AND erp.cargo.type == "frozen" AND bad >= {BAD_CABINETS} '
             '| EVAL km_to_go = ROUND(ST_DISTANCE(host.geo.location, TO_GEOPOINT(CONCAT("POINT(", TO_STRING(erp.delivery.lon), " ", '
-            'TO_STRING(erp.delivery.lat), ")"))) / 1000.0, 1), minutes_to_planned_arrival = DATE_DIFF("minutes", NOW(), erp.delivery.planned_arrival) '
+            'TO_STRING(erp.delivery.lat), ")"))) / 1000.0, 1), minutes_to_planned_arrival = DATE_DIFF("minutes", NOW(), erp.delivery.planned_arrival), '
+            'truck_status = coldchain.truck.status, at_destination = km_to_go < 0.5 '
             + (keep or "| SORT erp.delivery.planned_arrival | KEEP coldchain.truck.id, store, bad, km_to_go, minutes_to_planned_arrival, "
-                       "erp.delivery.id, erp.cargo.pallets, erp.cargo.value_eur, coldchain.truck.cargo_temp, coldchain.truck.status"))
+                       "erp.delivery.id, erp.cargo.pallets, erp.cargo.value_eur, coldchain.truck.cargo_temp, truck_status, at_destination"))
 
 
 def main() -> None:

@@ -118,7 +118,8 @@ TOOLS = [
                     "(at least 8 frozen cabinets with the setpoint raised or the air above -18 C and no defrost). One query over three "
                     "sources: the cabinet telemetry, the truck telemetry (position, cargo temperature) and the ERP delivery plan. "
                     "Returns per truck and stop: the store, how many frozen cabinets are bad, kilometres to go, minutes to the planned "
-                    "arrival, the ERP delivery id, pallets, cargo value in euros and the cargo temperature. The truck itself is cold: the risk is the store.",
+                    "arrival, the ERP delivery id, pallets, cargo value in euros and the cargo temperature. The truck itself is cold: the risk is the store. "
+                    "truck_status is what the truck is doing now, which may be unloading at an EARLIER stop; only at_destination = true means it is at this store.",
      "params": {},
      "query": trucks.at_risk_query()},
     {"id": "cc_what_is_normal",

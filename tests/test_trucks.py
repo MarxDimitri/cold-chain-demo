@@ -47,3 +47,8 @@ def test_at_risk_query_joins_cabinets_trucks_and_the_erp_without_nesting_subquer
     for part in ("metrics-coldchain.case-default", "logs-logistics.truck-default", "kb-erp-deliveries", "INLINE STATS bad = MAX(bad_cabinets) BY store",
                  'erp.cargo.type == "frozen"'):
         assert part in q
+
+
+def test_the_query_says_whether_the_truck_is_at_the_destination_or_busy_elsewhere():
+    q = trucks.at_risk_query()
+    assert "at_destination = km_to_go < 0.5" in q and q.rstrip().endswith("at_destination")
