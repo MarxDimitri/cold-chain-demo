@@ -202,7 +202,7 @@ def store_map(selected: str | None = None, town: str = "") -> str:
     else:
         head = '<div class="zbar"><span class="muted">Click a store to filter the page to it.</span></div>'
     return (STORE_MAP_TPL.replace("@@HEAD@@", head).replace("@@SEL@@", selected or "-").replace("@@W@@", str(w / 100)).replace("@@H@@", str(h / 100))
-            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 56))).replace("@@LEG2@@", str(round(h - 38))).replace("@@BAD@@", str(BAD_CABINETS)))
+            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 32))).replace("@@LEGBOX@@", str(round(h - 46))).replace("@@BAD@@", str(BAD_CABINETS)))
 
 
 STORE_MAP_TPL = BASE_CSS + """
@@ -228,7 +228,7 @@ STORE_MAP_TPL = BASE_CSS + """
   <text x="14" y="46" font-size="11" fill="currentColor" opacity=".5">Alsace</text>
   <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
   <text x="490" y="46" font-size="11" fill="currentColor" opacity=".5" text-anchor="end">Baden</text>
-  <text x="14" y="640" font-size="13" font-weight="700" fill="#9170B8" opacity=".8" letter-spacing="2">SWITZERLAND</text>
+  <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
   {% for row in rows %}{% if row["kind"].value == "truck" %}
     {% assign risk = 0 %}{% assign dx = row["tx"].value %}{% assign dy = row["ty"].value %}{% assign dtown = "" %}
     {% for st in rows %}{% if st["kind"].value == "store" and st["store"].value == row["dest"].value %}{% assign risk = st["bad_now"].value %}{% assign dx = st["x"].value %}{% assign dy = st["y"].value %}{% assign dtown = st["town"].value %}{% endif %}{% endfor %}
@@ -258,12 +258,11 @@ STORE_MAP_TPL = BASE_CSS + """
     <title>{{ row["truck"].value }} ({{ row["cargo"].value }}, cargo {{ row["cargo_temp"].value }} C, {{ row["pallets"].value }} pallets, EUR {{ row["value"].value }}), {{ row["status"].value }}. Next stop {{ row["dest"].value }} {{ dtown }}: planned in {{ row["eta"].value }} min (ERP {{ row["delivery"].value }}){% if trouble %}. The frozen cabinets there are not safe to load: {{ risk }} bad.{% endif %}</title>
   </g>
   {% endif %}{% endfor %}
-  <g font-size="12" fill="currentColor"><circle cx="20" cy="@@LEGY@@" r="7" fill="#54B399"/><text x="34" y="@@LEGY@@" dy="4">normal</text>
-    <circle cx="110" cy="@@LEGY@@" r="7" fill="#BD271E"/><text x="124" y="@@LEGY@@" dy="4">setpoints raised</text>
-    <circle cx="260" cy="@@LEGY@@" r="7" fill="#F5A700"/><text x="274" y="@@LEGY@@" dy="4">warm, no defrost</text>
-    <rect x="14" y="@@LEG2@@" width="14" height="10" rx="2" fill="#2E6DA4"/><text x="34" y="@@LEG2@@" dy="9">delivery truck (frozen)</text>
-    <rect x="190" y="@@LEG2@@" width="14" height="10" rx="2" fill="#BD271E"/><text x="210" y="@@LEG2@@" dy="9">frozen truck heading into trouble</text></g>
-  <text x="490" y="670" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot or a truck.</text>
+  <rect x="8" y="@@LEGBOX@@" width="372" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#54B399" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">normal</text>
+    <circle cx="108" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="122" y="@@LEGY@@" dy="4.5">setpoints raised</text>
+    <circle cx="250" cy="@@LEGY@@" r="7" fill="#F5A700" stroke="#fff" stroke-width="1.5"/><text x="264" y="@@LEGY@@" dy="4.5">warm, no defrost</text></g>
+  <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot or a truck.</text>
 </svg>
   {% for row in rows %}{% if row["kind"].value == "store" %}
   <a class="sd" style="left:{{ row["x"].value | divided_by: @@W@@ }}%;top:{{ row["y"].value | divided_by: @@H@@ }}%" title="Filter to {{ row["store"].value }} {{ row["town"].value }}"
