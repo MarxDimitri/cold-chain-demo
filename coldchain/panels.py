@@ -182,32 +182,49 @@ ESTATE_TILES = BASE_CSS + """
 """
 
 
-# Act 2: setpoint changes as vertical bars on a time strip. Rows: t, dir (up/down), total, detail, pct (x position, %), h (height, %).
-SETPOINT_BARS = BASE_CSS + """
+# Act 2: one chart, drawn as SVG: hottest and coolest store as lines, setpoint changes as vertical lines (red raised, blue lowered) with
+# a count badge and a hover text naming stores, cabinets, user and source. Rows: kind pt (x, yh, yc, y0, top, bot, hottest, coolest, when)
+# and kind ev (x, dir, total, detail, when), plus from_lbl and to_lbl.
+ESTATE_CHART = BASE_CSS + """
 <style>
-.cc .sb{position:relative;height:130px;border-bottom:2px solid rgba(128,128,128,.6);margin:6px 6px 0 6px;
-  background:repeating-linear-gradient(to right,rgba(128,128,128,.12) 0,rgba(128,128,128,.12) 1px,transparent 1px,transparent 12.5%)}
-.cc .sb a{position:absolute;bottom:0;width:.45%;min-width:7px;border-radius:2px 2px 0 0;cursor:help;display:block}
-.cc .sb a.up{background:#BD271E}
-.cc .sb a.down{background:#6092C0}
-.cc .sb a:hover{outline:2px solid currentColor}
-.cc .sbx{display:flex;justify-content:space-between;margin:2px 6px;font-size:11px;opacity:.75}
-.cc .sbl{margin:4px 6px;font-size:12px}
-.cc .sbl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 12px}
+.cc .ev{cursor:help}
+.cc .ev:hover .evl{stroke-width:4}
+.cc .pt{fill:transparent}
 </style>
-<div class="cc">
-<div class="sbl"><b>Setpoint changes</b><i style="background:#BD271E"></i>raised (warming)<i style="background:#6092C0"></i>lowered (cooling)
-  <span class="muted"> &middot; hover a bar for the stores and cabinets</span></div>
-<div class="sb">
-{% for row in rows %}
-<a class="{{ row["dir"].value }}" style="left:{% if row["dir"].value == "down" %}{{ row["pct"].value | plus: 0.5 }}{% else %}{{ row["pct"].value }}{% endif %}%;height:{{ row["h"].value }}%"
-   title="{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}. {{ row["detail"].value }}"></a>
-{% endfor %}
-</div>
-<div class="sbx">{% for row in rows %}{% if forloop.first %}<span>{{ row["from_lbl"].value }}</span><span>{{ row["to_lbl"].value }}</span>{% endif %}{% endfor %}</div>
-</div>
+{% assign hot = "" %}{% assign cool = "" %}{% assign y0 = 0 %}{% assign top = 0 %}{% assign bot = 0 %}{% assign fl = "" %}{% assign tl = "" %}
+{% for row in rows %}{% if row["kind"].value == "pt" %}
+  {% assign hot = hot | append: row["x"].value | append: "," | append: row["yh"].value | append: " " %}
+  {% assign cool = cool | append: row["x"].value | append: "," | append: row["yc"].value | append: " " %}
+  {% assign y0 = row["y0"].value %}{% assign top = row["top"].value %}{% assign bot = row["bot"].value %}
+{% endif %}{% assign fl = row["from_lbl"].value %}{% assign tl = row["to_lbl"].value %}{% endfor %}
+<div class="cc"><svg viewBox="0 0 1000 360" width="100%" role="img" aria-label="Hottest and coolest store with the setpoint changes">
+  <g stroke="currentColor" opacity=".18"><line x1="60" y1="20" x2="980" y2="20"/><line x1="60" y1="160" x2="980" y2="160"/><line x1="60" y1="300" x2="980" y2="300"/>
+    <line x1="290" y1="20" x2="290" y2="300"/><line x1="520" y1="20" x2="520" y2="300"/><line x1="750" y1="20" x2="750" y2="300"/></g>
+  <line x1="60" y1="{{ y0 }}" x2="980" y2="{{ y0 }}" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" opacity=".55"/>
+  <g font-size="12" fill="currentColor" opacity=".8" text-anchor="end"><text x="54" y="24">{{ top }}</text><text x="54" y="{{ y0 | plus: 4 }}">0</text><text x="54" y="304">{{ bot }}</text></g>
+  <text transform="translate(14,160) rotate(-90)" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">K above nominal</text>
+  <g font-size="12" fill="currentColor" opacity=".8"><text x="60" y="322">{{ fl }}</text><text x="980" y="322" text-anchor="end">{{ tl }}</text></g>
+  <polyline points="{{ cool }}" fill="none" stroke="#00BFB3" stroke-width="2.4" stroke-linejoin="round"/>
+  <polyline points="{{ hot }}" fill="none" stroke="#E7664C" stroke-width="2.4" stroke-linejoin="round"/>
+  {% for row in rows %}{% if row["kind"].value == "pt" %}
+  <rect class="pt" x="{{ row["x"].value | minus: 1.6 }}" y="20" width="3.2" height="280"><title>{{ row["when"].value }} UTC: hottest store {{ row["hottest"].value }} K, coolest store {{ row["coolest"].value }} K above nominal (median cabinet)</title></rect>
+  {% endif %}{% endfor %}
+  {% for row in rows %}{% if row["kind"].value == "ev" %}
+  <g class="ev">
+    <line class="evl" x1="{{ row["x"].value }}" y1="20" x2="{{ row["x"].value }}" y2="300" stroke="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}" stroke-width="2.4"/>
+    <rect x="{{ row["x"].value | minus: 13 }}" y="2" width="26" height="16" rx="8" fill="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}"/>
+    <text x="{{ row["x"].value }}" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{{ row["total"].value }}</text>
+    <rect x="{{ row["x"].value | minus: 7 }}" y="2" width="14" height="298" fill="transparent"/>
+    <title>{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}. {{ row["detail"].value }}</title>
+  </g>
+  {% endif %}{% endfor %}
+  <g font-size="12" fill="currentColor"><line x1="60" y1="344" x2="84" y2="344" stroke="#E7664C" stroke-width="2.4"/><text x="90" y="348">hottest store</text>
+    <line x1="190" y1="344" x2="214" y2="344" stroke="#00BFB3" stroke-width="2.4"/><text x="220" y="348">coolest store</text>
+    <line x1="330" y1="336" x2="330" y2="352" stroke="#BD271E" stroke-width="3"/><text x="338" y="348">setpoint raised (warming)</text>
+    <line x1="520" y1="336" x2="520" y2="352" stroke="#6092C0" stroke-width="3"/><text x="528" y="348">setpoint lowered (cooling)</text>
+    <text x="720" y="348" opacity=".7">hover a red or blue line for stores and cabinets</text></g>
+</svg></div>
 """
-
 
 STORE_GRID = BASE_CSS + """
 <style>
