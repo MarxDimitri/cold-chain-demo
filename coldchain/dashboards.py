@@ -368,8 +368,8 @@ def act1(store: str | None = None) -> Dash:
     sf = f' AND retail.store.id == "{store}"' if store else ""
     # Left: the schematic map of the stores. Right: the four tiles, then the chart.
     custom(d, "Twenty stores on the map", store_map_query(), panels.store_map(store, town), w=20, h=28, show_title=False)
-    custom(d, "Estate tiles", estate_tiles_query(store), panels.ESTATE_TILES, w=28, h=8, x=20, show_title=False)
-    d.row(8)
+    custom(d, "Estate tiles", estate_tiles_query(store), panels.ESTATE_TILES, w=28, h=9, x=20, show_title=False)
+    d.row(9)
     # One native chart (brush a time range to zoom, as in any Kibana chart): hottest and coolest store (median cabinet) as lines, the
     # setpoint changes as vertical bars on the right axis, raised (warming) red and lowered (cooling) blue, stacked.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T}{sf} AND @timestamp <= NOW() "
@@ -391,7 +391,7 @@ def act1(store: str | None = None) -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": f"K above nominal (hottest and coolest {'cabinet' if store else 'store'})", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 20, x=20, query=q)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 19, x=20, query=q)
     # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
     # next to the 46 changes and the 46 restores.
     tbl = (f'FROM logs-coldchain.audit-* | WHERE {T}{sf} AND event.action IN ("logged-in", "parameter-change") '
@@ -401,7 +401,7 @@ def act1(store: str | None = None) -> Dash:
            "| STATS n = COUNT(*), t = MAX(@timestamp) BY m = BUCKET(@timestamp, 1 minute), store = retail.store.id, user = user.name, src, what "
            '| SORT t DESC | LIMIT 60 | EVAL time = DATE_FORMAT("MM-dd HH:mm:ss", t), what = CASE(n > 1, CONCAT(what, " x", TO_STRING(n)), what) '
            "| RENAME src AS source | KEEP time, store, user, source, what")
-    d.row(20)
+    d.row(19)
     table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=48, h=11)
     d.row(11)
     return d

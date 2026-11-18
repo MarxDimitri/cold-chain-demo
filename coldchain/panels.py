@@ -156,16 +156,17 @@ REALMS_LIT = realms(True)
 # Act 2: four estate tiles with a coloured stripe, like Act 1. Query rows: ord, label, value, normal, delta, state (green, amber, red).
 ESTATE_TILES = BASE_CSS + """
 <style>
+.cc{container-type:inline-size}
 .cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:10px 16px}
+.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
 .cc .et.amber{border-left-color:#F5A700}
 .cc .et.red{border-left-color:#BD271E}
-.cc .et .lbl{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
-.cc .et .big{font-size:40px;font-weight:700;line-height:1.15}
+.cc .et .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .et .big{font-size:clamp(24px,2.8cqw,40px);font-weight:700;line-height:1.1}
 .cc .et.red .big{color:#BD271E}
 .cc .et.amber .big{color:#B77A00}
-.cc .et .norm{font-size:13px;opacity:.85}
-.cc .et .state{font-size:12px;font-weight:700;color:#00857c}
+.cc .et .norm{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
+.cc .et .state{font-size:clamp(10px,1cqw,12px);font-weight:700;color:#00857c}
 .cc .et.red .state{color:#BD271E}
 .cc .et.amber .state{color:#B77A00}
 </style>
@@ -205,7 +206,7 @@ def store_map(selected: str | None = None, town: str = "") -> str:
 
 STORE_MAP_TPL = BASE_CSS + """
 <style>
-.cc .map{max-width:600px;margin:0 auto;position:relative}
+.cc .map{max-width:540px;margin:0 auto;position:relative}
 .cc .zbar{font-size:13px;margin:0 8px 6px 8px;display:flex;gap:14px;align-items:center}
 .cc .zbar a{color:#0B64DD;text-decoration:underline}
 .cc a.sd{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;display:block;cursor:pointer}
