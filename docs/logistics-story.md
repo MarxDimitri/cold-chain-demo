@@ -9,8 +9,8 @@ The attack warms the freezers of S07, S11 and S19. Nobody on the refrigeration s
 and the cabinets at the destination are not. Put together in one query, the agent says: hold or reroute these three, unload into the cold room.
 The flag clears by itself when the cabinets have pulled down.
 
-On the Act 2 page: trucks move on the map (live, one position a minute), a dashed line joins each truck to its next stop, a frozen truck
-heading into trouble is red and pulses, and a card lists them with ETA, pallets, value and cargo temperature.
+On the Act 2 page: trucks move on the map (live, one position a minute), a dashed line joins each truck to its next stop, and a frozen truck
+heading into trouble is red and pulses. There is no tile: catching it is the agent's job (Act 4), from the three sources, with ETA, pallets, value and cargo temperature.
 
 ## Data (three sources, three systems of record)
 

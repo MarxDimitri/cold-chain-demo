@@ -205,29 +205,6 @@ def store_map(selected: str | None = None, town: str = "") -> str:
             .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 56))).replace("@@LEG2@@", str(round(h - 38))).replace("@@BAD@@", str(BAD_CABINETS)))
 
 
-# Act 2: the logistics card. One row: trucks (count of frozen trucks heading into trouble), value_eur, items (the list, joined with " | ").
-TRUCK_CARD = BASE_CSS + """
-<style>
-.cc{container-type:inline-size}
-.cc .tc{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
-.cc .tc.bad{border-left-color:#BD271E}
-.cc .tc .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
-.cc .tc .big{font-size:clamp(22px,2.4cqw,34px);font-weight:700;line-height:1.1;display:inline-block;margin-right:12px}
-.cc .tc.bad .big{color:#BD271E}
-.cc .tc .sub{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
-.cc .tc .item{font-size:clamp(10px,1.05cqw,13px);margin:1px 0}
-.cc .tc.bad .item b{color:#BD271E}
-</style>
-{% assign n = 0 %}{% assign val = 0 %}{% assign items = "" %}
-{% for row in rows %}{% assign n = row["trucks"].value %}{% assign val = row["value_eur"].value %}{% assign items = row["items"].value %}{% endfor %}
-<div class="cc"><div class="tc{% if n > 0 %} bad{% endif %}">
-  <div class="lbl">Frozen trucks heading into trouble</div>
-  <span class="big">{{ n }}</span><span class="sub">{% if n > 0 %}EUR {{ val }} of frozen goods on their way to stores whose frozen cabinets are not safe to load. Normal: none.{% else %}No frozen delivery is heading to a store in trouble. Normal: none.{% endif %}</span>
-  {% if n > 0 %}{% assign list = items | split: " | " %}{% for it in list %}<div class="item"><b>{{ it }}</b></div>{% endfor %}{% endif %}
-</div></div>
-"""
-
-
 STORE_MAP_TPL = BASE_CSS + """
 <style>
 .cc .map{max-width:540px;margin:0 auto;position:relative}

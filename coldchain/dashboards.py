@@ -314,17 +314,6 @@ def store_map_query() -> str:
     return f"FROM ({stores}), ({fleet}) | SORT kind, store"
 
 
-def trucks_card_query(store: str | None = None) -> str:
-    """One row for the logistics card: how many frozen trucks head for a store in trouble, their value, and the list as text."""
-    from . import trucks
-    sf = f'| WHERE store == "{store}" ' if store else ""
-    keep = (sf + '| EVAL item = CONCAT(coldchain.truck.id, " to ", store, " ", erp.delivery.town, ": ", TO_STRING(minutes_to_planned_arrival), '
-            '" min, ", TO_STRING(erp.cargo.pallets), " pallets, EUR ", TO_STRING(erp.cargo.value_eur), ", cargo ", '
-            'TO_STRING(ROUND(coldchain.truck.cargo_temp, 1)), " C") '
-            '| STATS trucks = COUNT_DISTINCT(coldchain.truck.id), value_eur = SUM(erp.cargo.value_eur), items = MV_CONCAT(MV_SORT(VALUES(item)), " | ")')
-    return trucks.at_risk_query(keep=keep)
-
-
 def estate_tiles_query(store: str | None = None) -> str:
     """Four values, each looked up against its normal in kb-baselines; the stripe colour comes from the same thresholds as before."""
     from .baselines import THRESHOLDS as th
@@ -373,8 +362,6 @@ def act1(store: str | None = None) -> Dash:
     custom(d, "Twenty stores on the map", store_map_query(), panels.store_map(store, town), w=20, h=28, show_title=False)
     custom(d, "Estate tiles", estate_tiles_query(store), panels.ESTATE_TILES, w=28, h=9, x=20, show_title=False)
     d.row(9)
-    custom(d, "Frozen trucks heading into trouble", trucks_card_query(store), panels.TRUCK_CARD, w=28, h=7, x=20, show_title=False)
-    d.row(7)
     # One native chart (brush a time range to zoom, as in any Kibana chart): hottest and coolest store (median cabinet) as lines, the
     # setpoint changes as vertical bars on the right axis, raised (warming) red and lowered (cooling) blue, stacked.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T}{sf} AND @timestamp <= NOW() "
@@ -396,7 +383,7 @@ def act1(store: str | None = None) -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": f"K above nominal (hottest and coolest {'cabinet' if store else 'store'})", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 12, x=20, query=q)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 19, x=20, query=q)
     # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
     # next to the 46 changes and the 46 restores.
     tbl = (f'FROM logs-coldchain.audit-* | WHERE {T}{sf} AND event.action IN ("logged-in", "parameter-change") '
@@ -406,7 +393,7 @@ def act1(store: str | None = None) -> Dash:
            "| STATS n = COUNT(*), t = MAX(@timestamp) BY m = BUCKET(@timestamp, 1 minute), store = retail.store.id, user = user.name, src, what "
            '| SORT t DESC | LIMIT 60 | EVAL time = DATE_FORMAT("MM-dd HH:mm:ss", t), what = CASE(n > 1, CONCAT(what, " x", TO_STRING(n)), what) '
            "| RENAME src AS source | KEEP time, store, user, source, what")
-    d.row(12)
+    d.row(19)
     table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=48, h=11)
     d.row(11)
     return d

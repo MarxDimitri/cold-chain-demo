@@ -47,8 +47,8 @@ pos-download, internal-pivot, exposed-controllers, truck-at-risk (one finding pe
 List in `tools` the ids of the tools whose results support each finding (for example `cc_history_of_address`).
 Keep the text short, it is shown in a dashboard table: title at most 70 characters, proposed_action at most 120,
 why_abnormal at most 200 and evidence at most 250 (numbers and times, no sentences repeated from the title).
-Severity: critical when something changed a setpoint or a device acts from inside a store, high for a first visit or exposed
-controllers sharing a contractor account, medium or low otherwise. Propose actions, do not run any. If nothing is abnormal,
+Severity: critical when something changed a setpoint or a device acts from inside a store, high for a first visit, exposed
+controllers sharing a contractor account, or a frozen truck heading into a store in trouble (money and a clock), medium or low otherwise. Propose actions, do not run any. If nothing is abnormal,
 return no findings."""
 
 SCHEMA = {
