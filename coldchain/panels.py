@@ -192,10 +192,7 @@ STORE_LAYOUT = BASE_CSS + """
 <div class="cc-store-svg">
 <svg viewBox="0 0 1250 640" width="100%" role="img" aria-label="Store 07 from above">
   <rect x="10" y="40" width="1090" height="590" rx="6" fill="none" stroke="currentColor" stroke-width="3"/>
-  <text x="14" y="26" font-size="18" font-weight="700" fill="currentColor">Store 07, Colmar</text>
-  <text x="150" y="26" font-size="12" fill="currentColor" opacity=".7">every box that holds data, and what it says</text>
 
-  <text x="30" y="72" font-size="12" fill="#00857c" font-weight="700">FREEZER AND CHILLER CABINETS C01 to C24 (case controllers)</text>
   {% assign ci = 0 %}
   {% for row in rows %}{% if row["kind"].value == "cabinet" %}
     {% assign col = ci | modulo: 12 %}{% assign line = ci | divided_by: 12 | floor %}
