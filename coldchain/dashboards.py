@@ -254,14 +254,14 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
     d = Dash("coldchain-act1a-cabinet" if default else f"coldchain-act1a-{cabinet.lower()}",
              "Act 1: Store 07, Colmar, from above - what each system says" + ("" if default else f" (cabinet {cabinet[-2:]})"),
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
-    custom(d, "Store 07 from above", STORE_QUERY, panels.store_layout(cabinet), w=32, h=36, show_title=False)
+    custom(d, "Store 07 from above", STORE_QUERY, panels.store_layout(cabinet), w=32, h=22, show_title=False)
     tiles_q = (f"FROM (FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() | SORT @timestamp DESC | LIMIT 1 "
                "| EVAL kind = \"now\", setpoint = ROUND(coldchain.case.setpoint, 1), air = ROUND(coldchain.case.temperature.air, 1) "
                "| KEEP kind, setpoint, air), "
                f"(FROM logs-coldchain.audit-* | WHERE {cab} AND {T} AND event.action == \"parameter-change\" "
                "| STATS changes = COUNT(*) | EVAL kind = \"changes\" | KEEP kind, changes)")
-    custom(d, "State of the cabinet the contractor sees", tiles_q, panels.cabinet_tiles(cabinet), w=16, h=36, x=32, show_title=False)
-    d.row(36)
+    custom(d, "State of the cabinet the contractor sees", tiles_q, panels.cabinet_tiles(cabinet), w=16, h=22, x=32, show_title=False)
+    d.row(22)
     q = (f"FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() "
          "| STATS air = ROUND(AVG(coldchain.case.temperature.air), 1), setpoint = ROUND(AVG(coldchain.case.setpoint), 1) "
          "BY t = BUCKET(@timestamp, 5 minutes) | SORT t")

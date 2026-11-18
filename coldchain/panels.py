@@ -242,12 +242,12 @@ POS_EVIDENCE = BASE_CSS + """
 _TILES_TPL = BASE_CSS + """
 <style>
 .cc .tiles{display:flex;flex-direction:column;gap:12px;height:100%}
-.cc .tile{flex:1;min-height:170px;border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:12px 16px;
+.cc .tile{flex:1;min-height:150px;border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:12px 16px;
   display:flex;flex-direction:column;justify-content:center}
 .cc .tile.bad{border-left-color:#BD271E}
 .cc .back{font-size:13px}.cc .back a{color:#0B64DD;text-decoration:underline}
 .cc .tile .lbl{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
-.cc .tile .big{font-size:54px;font-weight:700;line-height:1.1;margin:4px 0}
+.cc .tile .big{font-size:46px;font-weight:700;line-height:1.1;margin:4px 0}
 .cc .tile.bad .big{color:#BD271E}
 .cc .tile .unit{font-size:20px;font-weight:400;opacity:.7}
 .cc .tile .norm{font-size:13px;opacity:.85}
