@@ -239,13 +239,6 @@ POS_EVIDENCE = BASE_CSS + """
 # Act 1: the store from above, with the aggregates of every system rendered where that system sits in the store.
 # Query: one union of four kinds of rows (cabinet, audit, flows, asset, assets); see STORE_QUERY in dashboards.py.
 STORE_LAYOUT = BASE_CSS + """
-<style>
-.cc-store-wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
-.cc-store-svg{flex:1 1 760px;min-width:520px}
-.cc-legend{flex:0 0 250px}
-.cc-legend .item{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px 0}
-.cc-legend .sw{flex:0 0 18px;height:18px;border-radius:3px;margin-top:2px}
-</style>
 {% assign changes = 0 %}{% assign logins = 0 %}{% assign events = 0 %}{% assign readings = 0 %}{% assign attacked = 0 %}
 {% assign f_sm = 0 %}{% assign f_srv = 0 %}{% assign f_lane = 0 %}{% assign f_bo = 0 %}{% assign f_total = 0 %}
 {% assign mb_srv = 0 %}{% assign mb_lane = 0 %}{% assign mb_bo = 0 %}{% assign mb_total = 0 %}
@@ -268,91 +261,89 @@ STORE_LAYOUT = BASE_CSS + """
     {% if row["setpoint"].value > 5 %}{% assign attacked = attacked | plus: 1 %}{% endif %}
   {% endif %}
 {% endfor %}
-<div class="cc"><div class="cc-store-wrap">
-<div class="cc-store-svg">
-<svg viewBox="0 0 1250 640" width="100%" role="img" aria-label="Store 07 from above">
-  <rect x="10" y="40" width="1090" height="590" rx="6" fill="none" stroke="currentColor" stroke-width="3"/>
+<div class="cc" style="max-width:1280px;margin:0 auto">
+<svg viewBox="0 0 1200 560" width="100%" role="img" aria-label="Store 07 from above" font-family="inherit">
+  <rect x="5" y="5" width="1190" height="550" rx="14" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".8"/>
 
   {% assign ci = 0 %}
   {% for row in rows %}{% if row["kind"].value == "cabinet" %}
     {% assign col = ci | modulo: 12 %}{% assign line = ci | divided_by: 12 | floor %}
-    {% assign x = col | times: 50 | plus: 30 %}{% assign y = line | times: 52 | plus: 84 %}
-    {% if row["setpoint"].value > 5 %}{% assign fill = "#BD271E" %}{% assign stroke = "#7a1b15" %}{% assign ink = "#ffffff" %}
-    {% elsif ci > 15 %}{% assign fill = "#D7E8F7" %}{% assign stroke = "#6092C0" %}{% assign ink = "#1a1c21" %}
+    {% assign x = col | times: 60 | plus: 24 %}{% assign y = line | times: 44 | plus: 22 %}
+    {% if row["setpoint"].value > 5 %}{% assign fill = "#9C3B26" %}{% assign stroke = "#6e2414" %}{% assign ink = "#ffffff" %}
+    {% elsif ci > 15 %}{% assign fill = "#E4EAF7" %}{% assign stroke = "#9FB3D8" %}{% assign ink = "#1a1c21" %}
     {% else %}{% assign fill = "#CDEFEA" %}{% assign stroke = "#00BFB3" %}{% assign ink = "#1a1c21" %}{% endif %}
-    <rect x="{{ x }}" y="{{ y }}" width="44" height="44" rx="4" fill="{{ fill }}" stroke="{{ stroke }}" stroke-width="{% if row["cab"].value == "S07-C05" %}5{% else %}2{% endif %}">
+    <rect x="{{ x }}" y="{{ y }}" width="54" height="38" rx="6" fill="{{ fill }}" stroke="{% if row["cab"].value == "S07-C05" %}#1a1c21{% else %}{{ stroke }}{% endif %}" stroke-width="{% if row["cab"].value == "S07-C05" %}4{% else %}1.5{% endif %}">
       <title>{{ row["cab"].value }}: setpoint {{ row["setpoint"].value }} C, {{ row["readings"].value }} readings</title></rect>
-    <text x="{{ x | plus: 22 }}" y="{{ y | plus: 27 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text>
+    <text x="{{ x | plus: 27 }}" y="{{ y | plus: 25 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text>
     {% assign ci = ci | plus: 1 %}
   {% endif %}{% endfor %}
-  <text x="30" y="204" font-size="12" fill="currentColor">C05 (heavy outline): the one cabinet the contractor sees.</text>
-  <text x="30" y="224" font-size="13" font-weight="700" fill="{% if attacked > 0 %}#BD271E{% else %}#00857c{% endif %}">{{ readings }} readings in the window{% if attacked > 0 %}, {{ attacked }} cabinets at +50 C{% endif %}</text>
-
-  <rect x="660" y="56" width="200" height="200" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-  <text x="760" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Plant room</text>
-  <rect x="672" y="86" width="176" height="28" rx="6" fill="#343741"/>
-  <text x="760" y="105" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Compressor rack</text>
-  <rect x="672" y="124" width="176" height="124" rx="6" fill="{% if changes > 0 %}#BD271E{% else %}#00A79D{% endif %}"/>
-  <text x="760" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">AK-SM 800A system manager</text>
-  <text x="760" y="166" text-anchor="middle" font-size="12" fill="#fff">{{ events }} audit events</text>
-  <text x="760" y="184" text-anchor="middle" font-size="12" fill="#fff">{{ changes }} parameter changes</text>
-  <text x="760" y="202" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">{{ logins }} outside logins</text>
-  <text x="760" y="222" text-anchor="middle" font-size="12" fill="#fff">firmware {{ firmware }} · {{ f_sm }} flows</text>
-  <text x="760" y="240" text-anchor="middle" font-size="11" fill="#fff" opacity=".9">default account, {% if internet == true %}internet-facing{% else %}not exposed{% endif %}</text>
-  <line x1="600" y1="150" x2="660" y2="150" stroke="#00BFB3" stroke-width="3" stroke-dasharray="8 6"/>
-
-  <rect x="880" y="56" width="200" height="200" rx="6" fill="#CDEFEA" stroke="#00BFB3" stroke-width="2"/>
-  <text x="980" y="160" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1c21">Cold room</text>
-
-  {% if internet == true %}
-  <path d="M1115 100 a24 24 0 0 1 8 -46 a34 34 0 0 1 64 8 a24 24 0 0 1 10 38 z" fill="#E7664C"/>
-  <text x="1170" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">contractor</text>
-  <text x="1170" y="98" text-anchor="middle" font-size="11" fill="#fff">{{ contractor }}</text>
-  <path d="M1170 110 L1170 160 L850 160" fill="none" stroke="#BD271E" stroke-width="3" stroke-dasharray="9 7"/>
-  <text x="1110" y="180" text-anchor="middle" font-size="11" fill="#BD271E">logins from the internet</text>
-  <text x="1110" y="194" text-anchor="middle" font-size="11" fill="#BD271E">reach the manager directly</text>
+  <line x1="738" y1="95" x2="782" y2="95" stroke="#00BFB3" stroke-width="3" stroke-dasharray="7 5"/>
+  <text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">C05 (heavy outline): the one cabinet the contractor sees.</text>
+  <text x="24" y="148" font-size="13" font-weight="700" fill="{% if attacked > 0 %}#BD271E{% else %}#00857c{% endif %}">{% if attacked > 0 %}{{ attacked }} cabinets at +50 °C{% else %}{{ readings }} readings in the window, all cabinets in band{% endif %}</text>
+  {% if attacked > 0 %}
+  <text x="440" y="148" font-size="11" font-weight="700" letter-spacing="1.5" fill="#BD271E">AT RISK</text>
+  <g font-size="26"><text x="510" y="152">🍦</text><text x="556" y="152">🐟</text><text x="602" y="152">🥦</text><text x="648" y="152">❄️</text></g>
   {% endif %}
 
-  <text x="30" y="300" font-size="12" font-weight="700" fill="currentColor" opacity=".6">SALES FLOOR</text>
-  <rect x="40" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/><rect x="150" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
-  <rect x="260" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/><rect x="370" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
-  <rect x="480" y="316" width="70" height="170" fill="rgba(128,128,128,.25)"/>
+  <rect x="770" y="18" width="200" height="198" rx="8" fill="none" stroke="currentColor" stroke-width="2" opacity=".8"/>
+  <text x="870" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Plant room</text>
+  <rect x="782" y="48" width="176" height="26" rx="6" fill="#2a2d35"/>
+  <text x="870" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Compressor rack</text>
+  <rect x="782" y="84" width="176" height="120" rx="6" fill="{% if changes > 0 %}#9C3B26{% else %}#00A79D{% endif %}"/>
+  <text x="870" y="106" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">AK-SM 800A</text>
+  <text x="870" y="126" text-anchor="middle" font-size="12" fill="#fff">{{ events }} audit events</text>
+  <text x="870" y="143" text-anchor="middle" font-size="12" fill="#fff">{{ changes }} parameter changes</text>
+  <text x="870" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">{{ logins }} outside login{% if logins != 1 %}s{% endif %}</text>
+  <text x="870" y="177" text-anchor="middle" font-size="12" fill="#fff">default account</text>
+  <text x="870" y="195" text-anchor="middle" font-size="10" fill="#fff" opacity=".85">firmware {{ firmware }} · {{ f_sm }} flows</text>
 
-  <text x="30" y="520" font-size="12" font-weight="700" fill="currentColor">CHECKOUT LANES</text>
-  <rect x="30" y="530" width="78" height="40" rx="5" fill="#8C97A8"/><rect x="118" y="530" width="78" height="40" rx="5" fill="#8C97A8"/>
-  <rect x="206" y="530" width="78" height="40" rx="5" fill="#8C97A8"/><rect x="294" y="530" width="78" height="40" rx="5" fill="#8C97A8"/>
-  <text x="69" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 1</text><text x="157" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 2</text>
-  <text x="245" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 3</text><text x="333" y="555" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">POS 4</text>
-  <text x="30" y="592" font-size="12" fill="currentColor">{{ f_lane }} flows · {{ mb_lane }} MB to the store server and the payment gateway</text>
-  <text x="400" y="624" font-size="11" fill="currentColor" opacity=".7">entrance</text><rect x="390" y="628" width="90" height="4" fill="currentColor" opacity=".4"/>
+  <rect x="985" y="18" width="200" height="198" rx="8" fill="#DCF1EE" stroke="#7BC4BB" stroke-width="2"/>
+  <text x="1085" y="122" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1c21">Cold room</text>
 
-  <rect x="660" y="290" width="410" height="300" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-  <text x="865" y="312" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Back office · network cabinet</text>
-  <rect x="676" y="326" width="378" height="56" rx="6" fill="#1a1c21"/>
-  <text x="865" y="350" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">SD-WAN router / firewall</text>
-  <text x="865" y="370" text-anchor="middle" font-size="12" fill="#fff">{{ f_total }} flows · {{ mb_total | round: 1 }} MB seen in the window</text>
-  <rect x="676" y="394" width="184" height="64" rx="6" fill="#8C97A8"/>
-  <text x="768" y="418" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Store server</text>
-  <text x="768" y="438" text-anchor="middle" font-size="12" fill="#fff">{{ f_srv }} flows · {{ mb_srv }} MB</text>
-  <rect x="870" y="394" width="184" height="64" rx="6" fill="#8C97A8"/>
-  <text x="962" y="418" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Back-office POS</text>
-  <text x="962" y="438" text-anchor="middle" font-size="12" fill="#fff">{{ f_bo }} flows · {{ mb_bo }} MB</text>
-  <text x="865" y="486" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">run by central IT: {{ devices }} devices in the inventory</text>
-  <text x="865" y="508" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">one flat store network: nothing separates these</text>
-  <text x="865" y="526" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">boxes from the refrigeration controller</text>
+  <text x="24" y="206" font-size="12" font-weight="700" letter-spacing="1" fill="currentColor" opacity=".6">SALES FLOOR</text>
+  <g fill="rgba(128,128,128,.10)" stroke="rgba(128,128,128,.55)" stroke-width="1.5">
+    <rect x="24" y="218" width="118" height="152" rx="8"/><rect x="152" y="218" width="118" height="152" rx="8"/>
+    <rect x="280" y="218" width="118" height="152" rx="8"/><rect x="408" y="218" width="118" height="152" rx="8"/>
+    <rect x="536" y="218" width="118" height="152" rx="8"/>
+  </g>
+  <g font-size="12" font-weight="700" text-anchor="middle" fill="currentColor" opacity=".85">
+    <text x="83" y="240">Fruit</text><text x="211" y="240">Vegetables</text><text x="339" y="240">Bakery</text><text x="467" y="240">Dairy</text><text x="595" y="240">Drinks</text>
+  </g>
+  <g font-size="27" text-anchor="middle">
+    <text x="55" y="285">🍌</text><text x="110" y="285">🍍</text><text x="83" y="335">🍎</text>
+    <text x="183" y="285">🍅</text><text x="238" y="285">🥕</text><text x="211" y="335">🥬</text>
+    <text x="311" y="285">🥖</text><text x="366" y="285">🥐</text><text x="339" y="335">🧁</text>
+    <text x="439" y="285">🥛</text><text x="494" y="285">🧀</text><text x="467" y="335">🥚</text>
+    <text x="567" y="285">🍷</text><text x="622" y="285">🥫</text><text x="595" y="335">💧</text>
+  </g>
 
-  <g fill="#69707D"><rect x="570" y="300" width="26" height="16" rx="3"/><polygon points="596,304 608,298 608,318 596,312"/>
-  <rect x="570" y="470" width="26" height="16" rx="3"/><polygon points="596,474 608,468 608,488 596,482"/>
-  <rect x="20" y="468" width="0" height="0"/></g>
-  <text x="560" y="336" font-size="11" fill="currentColor" opacity=".7">3 cameras</text>
+  <g fill="#69707D"><rect x="672" y="248" width="26" height="16" rx="3"/><polygon points="698,252 710,246 710,266 698,260"/>
+  <rect x="672" y="332" width="26" height="16" rx="3"/><polygon points="698,336 710,330 710,350 698,344"/></g>
+  <text x="682" y="286" font-size="11" fill="currentColor" opacity=".75">3 cameras</text>
+
+  <text x="24" y="402" font-size="12" font-weight="700" letter-spacing="1" fill="currentColor" opacity=".6">CHECKOUT LANES</text>
+  <g fill="#8F96A8"><rect x="24" y="414" width="90" height="40" rx="6"/><rect x="124" y="414" width="90" height="40" rx="6"/>
+  <rect x="224" y="414" width="90" height="40" rx="6"/><rect x="324" y="414" width="90" height="40" rx="6"/></g>
+  <g font-size="12" font-weight="700" fill="#fff" text-anchor="middle"><text x="69" y="439">POS 1</text><text x="169" y="439">POS 2</text><text x="269" y="439">POS 3</text><text x="369" y="439">POS 4</text></g>
+  <text x="24" y="482" font-size="12" fill="currentColor" opacity=".85">{{ f_lane }} flows · {{ mb_lane }} MB to the store server and the payment gateway</text>
+  <text x="330" y="534" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">entrance</text><rect x="270" y="542" width="120" height="5" rx="2" fill="currentColor" opacity=".4"/>
+
+  <rect x="770" y="232" width="415" height="290" rx="8" fill="none" stroke="currentColor" stroke-width="2" opacity=".8"/>
+  <text x="977" y="258" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Back office · network cabinet</text>
+  <rect x="786" y="272" width="383" height="54" rx="6" fill="#1a1c21"/>
+  <text x="977" y="295" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">SD-WAN router / firewall</text>
+  <text x="977" y="314" text-anchor="middle" font-size="12" fill="#fff">{{ f_total }} flows · {{ mb_total | round: 1 }} MB seen in the window</text>
+  <rect x="786" y="338" width="185" height="58" rx="6" fill="#8F96A8"/>
+  <text x="878" y="361" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Store server</text>
+  <text x="878" y="381" text-anchor="middle" font-size="12" fill="#fff">{{ f_srv }} flows · {{ mb_srv }} MB</text>
+  <rect x="984" y="338" width="185" height="58" rx="6" fill="#8F96A8"/>
+  <text x="1076" y="361" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Back-office POS</text>
+  <text x="1076" y="381" text-anchor="middle" font-size="12" fill="#fff">{{ f_bo }} flows · {{ mb_bo }} MB</text>
+  <g font-size="12" text-anchor="middle" fill="currentColor" opacity=".85">
+    <text x="977" y="428">run by central IT: {{ devices }} devices in the inventory</text>
+    <text x="977" y="450">one flat store network: nothing separates these boxes from the</text>
+    <text x="977" y="468">refrigeration controller</text>
+  </g>
 </svg>
 </div>
-<div class="cc-legend">
-  <div class="muted" style="font-weight:700;letter-spacing:.04em;margin-bottom:10px">WHAT WE COLLECT FOR THIS STORE</div>
-  <div class="item"><div class="sw" style="background:#00BFB3"></div><div><b>Cabinet telemetry</b><div class="muted">{{ readings }} readings: temperature, setpoint, defrost</div></div></div>
-  <div class="item"><div class="sw" style="background:#E7664C"></div><div><b>System manager audit</b><div class="muted">{{ events }} events: logins, commands, firmware</div></div></div>
-  <div class="item"><div class="sw" style="background:#1a1c21"></div><div><b>Network flows</b><div class="muted">{{ f_total }} flows summarised per device pair</div></div></div>
-  <div class="item"><div class="sw" style="background:#8C97A8"></div><div><b>Asset inventory</b><div class="muted">{{ devices }} devices, owner, contractor, exposure</div></div></div>
-</div>
-</div></div>
 """
