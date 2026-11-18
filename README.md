@@ -19,7 +19,7 @@ version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is pres
 |---|---|---|
 | 0:00 | **Act 0: The streetlight effect - we search where the light is** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
 | 1:30 | **Act 1: Store 07, Colmar, from above - what each system says** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
-| 3:00 | **Act 2: The same blip across the whole estate, not on SOC's radar** | Twenty stores in one look: 46 setpoint changes in 3 stores, one of them from inside the store. |
+| 3:00 | **Act 2: The same blip across the whole estate, not on SOC's radar** | A map of the 20 stores with delivery trucks moving on it: 46 setpoint changes in 3 stores, one of them from inside the store, and three frozen trucks heading for them (`docs/logistics-story.md`). |
 | 5:30 | **Act 3: The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
 | 8:00 | **Act 4: Hunting agent - the agent that keeps looking** | Nobody asked, and something is going on: findings with evidence, including a POS terminal talking to the refrigeration controller. |
 | 11:30 | **Act 5: The POS that nobody watched** | The evidence: a 4 GB night-time download, its CPU, its disk, the first time it reached the controller. |

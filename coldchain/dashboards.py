@@ -285,41 +285,44 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
 
 
 # (longitude, latitude, town) of each store, for the schematic map of Act 2 (towns from config/chain.yaml)
-STORE_GEO = {
-    "S01": (7.752, 48.573, "Strasbourg"),
-    "S02": (7.749, 48.608, "Schiltigheim"),
-    "S03": (7.336, 47.75, "Mulhouse"),
-    "S04": (7.789, 48.815, "Haguenau"),
-    "S05": (7.454, 48.26, "Selestat"),
-    "S06": (7.363, 48.742, "Saverne"),
-    "S07": (7.358, 48.079, "Colmar"),
-    "S08": (7.716, 48.53, "Illkirch"),
-    "S09": (7.105, 47.81, "Thann"),
-    "S10": (7.944, 49.037, "Wissembourg"),
-    "S11": (7.815, 48.573, "Kehl"),
-    "S12": (7.944, 48.473, "Offenburg"),
-    "S13": (7.842, 47.999, "Freiburg"),
-    "S14": (7.87, 48.34, "Lahr"),
-    "S15": (8.24, 48.76, "Baden-Baden"),
-    "S16": (8.204, 48.859, "Rastatt"),
-    "S17": (7.852, 48.121, "Emmendingen"),
-    "S18": (7.661, 47.615, "Loerrach"),
-    "S19": (8.404, 49.007, "Karlsruhe"),
-    "S20": (7.632, 47.808, "Muellheim"),
-}
+from .geo import STORE_GEO  # noqa: E402  (towns of the stores, shared with the truck generator)
 
 
 def store_map_query() -> str:
-    """One row per store for the map: how many cabinets are at +50 or warm without defrost, plus the map position of its town."""
-    from . import mapdata
+    """Rows for the map: one per store (cabinets at +50, warm, bad frozen cabinets right now, position) and one per truck (position,
+    cargo, next stop from the ERP plan, minutes to the planned arrival)."""
+    from . import mapdata, trucks
     xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S, 1)}' for k, v in STORE_GEO.items())
     ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S, 1)}' for k, v in STORE_GEO.items())
     towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
-    return (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
-            "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
-            "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
-            "AND coldchain.case.setpoint > 5 BY store = retail.store.id "
-            f'| EVAL x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "") | SORT store')
+    stores = ("FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - " + NOMINAL +
+              " | STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
+              "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
+              "AND coldchain.case.setpoint > 5, "
+              "bad_now = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 15 minutes AND @timestamp <= NOW() AND coldchain.application == \"frozen\" "
+              f"AND {trucks.BAD_CABINET} BY store = retail.store.id "
+              f'| EVAL kind = "store", x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "")')
+    tx = f"ROUND((ST_X(host.geo.location) - {mapdata.LON0}) * {mapdata.K} * {mapdata.S}, 1)"
+    ty = f"ROUND(({mapdata.LAT1} - ST_Y(host.geo.location)) * {mapdata.S}, 1)"
+    fleet = (trucks.upcoming_stops() + " | INLINE STATS first_arr = MIN(erp.delivery.planned_arrival) BY device.id "
+             "| WHERE erp.delivery.planned_arrival == first_arr "
+             f'| EVAL kind = "truck", truck = device.id, dest = retail.store.id, cargo = coldchain.truck.cargo, '
+             "cargo_temp = ROUND(coldchain.truck.cargo_temp, 1), status = coldchain.truck.status, "
+             'eta = DATE_DIFF("minutes", NOW(), erp.delivery.planned_arrival), pallets = erp.cargo.pallets, value = erp.cargo.value_eur, '
+             f"delivery = erp.delivery.id, tx = {tx}, ty = {ty} "
+             "| KEEP kind, truck, dest, cargo, cargo_temp, status, eta, pallets, value, delivery, tx, ty")
+    return f"FROM ({stores}), ({fleet}) | SORT kind, store"
+
+
+def trucks_card_query(store: str | None = None) -> str:
+    """One row for the logistics card: how many frozen trucks head for a store in trouble, their value, and the list as text."""
+    from . import trucks
+    sf = f'| WHERE store == "{store}" ' if store else ""
+    keep = (sf + '| EVAL item = CONCAT(coldchain.truck.id, " to ", store, " ", erp.delivery.town, ": ", TO_STRING(minutes_to_planned_arrival), '
+            '" min, ", TO_STRING(erp.cargo.pallets), " pallets, EUR ", TO_STRING(erp.cargo.value_eur), ", cargo ", '
+            'TO_STRING(ROUND(coldchain.truck.cargo_temp, 1)), " C") '
+            '| STATS trucks = COUNT_DISTINCT(coldchain.truck.id), value_eur = SUM(erp.cargo.value_eur), items = MV_CONCAT(MV_SORT(VALUES(item)), " | ")')
+    return trucks.at_risk_query(keep=keep)
 
 
 def estate_tiles_query(store: str | None = None) -> str:
@@ -370,6 +373,8 @@ def act1(store: str | None = None) -> Dash:
     custom(d, "Twenty stores on the map", store_map_query(), panels.store_map(store, town), w=20, h=28, show_title=False)
     custom(d, "Estate tiles", estate_tiles_query(store), panels.ESTATE_TILES, w=28, h=9, x=20, show_title=False)
     d.row(9)
+    custom(d, "Frozen trucks heading into trouble", trucks_card_query(store), panels.TRUCK_CARD, w=28, h=7, x=20, show_title=False)
+    d.row(7)
     # One native chart (brush a time range to zoom, as in any Kibana chart): hottest and coolest store (median cabinet) as lines, the
     # setpoint changes as vertical bars on the right axis, raised (warming) red and lowered (cooling) blue, stacked.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T}{sf} AND @timestamp <= NOW() "
@@ -391,7 +396,7 @@ def act1(store: str | None = None) -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": f"K above nominal (hottest and coolest {'cabinet' if store else 'store'})", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 19, x=20, query=q)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 12, x=20, query=q)
     # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
     # next to the 46 changes and the 46 restores.
     tbl = (f'FROM logs-coldchain.audit-* | WHERE {T}{sf} AND event.action IN ("logged-in", "parameter-change") '
@@ -401,7 +406,7 @@ def act1(store: str | None = None) -> Dash:
            "| STATS n = COUNT(*), t = MAX(@timestamp) BY m = BUCKET(@timestamp, 1 minute), store = retail.store.id, user = user.name, src, what "
            '| SORT t DESC | LIMIT 60 | EVAL time = DATE_FORMAT("MM-dd HH:mm:ss", t), what = CASE(n > 1, CONCAT(what, " x", TO_STRING(n)), what) '
            "| RENAME src AS source | KEEP time, store, user, source, what")
-    d.row(19)
+    d.row(12)
     table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=48, h=11)
     d.row(11)
     return d

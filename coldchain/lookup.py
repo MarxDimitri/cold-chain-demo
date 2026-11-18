@@ -192,6 +192,7 @@ def main() -> None:
     _write("kb-regulations", regulation_rows())
     _write("kb-assets", assets)
     _write("kb-assets-by-ip", by_ip)
+    _write("kb-erp-deliveries", [])  # the delivery plan is loaded by the replay (times are relative to T0)
 
 
 if __name__ == "__main__":

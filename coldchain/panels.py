@@ -186,6 +186,7 @@ ESTATE_TILES = BASE_CSS + """
 # Act 2: a map of the 20 stores. The base map (borders, regions, the Rhine) is real vector data from Natural Earth, baked into SVG paths
 # (coldchain/mapdata.py): custom panels cannot load map tiles. Rows: store, attacked, warm, x, y, town.
 def store_map(selected: str | None = None, town: str = "") -> str:
+    from .trucks import BAD_CABINETS
     from .mapdata import COUNTRIES, REGIONS, RIVERS, VIEWBOX
     w, h = VIEWBOX
     land = {"France": "#6092C0", "Germany": "#F5A700", "Switzerland": "#9170B8"}
@@ -201,7 +202,30 @@ def store_map(selected: str | None = None, town: str = "") -> str:
     else:
         head = '<div class="zbar"><span class="muted">Click a store to filter the page to it.</span></div>'
     return (STORE_MAP_TPL.replace("@@HEAD@@", head).replace("@@SEL@@", selected or "-").replace("@@W@@", str(w / 100)).replace("@@H@@", str(h / 100))
-            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 34))))
+            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 56))).replace("@@LEG2@@", str(round(h - 38))).replace("@@BAD@@", str(BAD_CABINETS)))
+
+
+# Act 2: the logistics card. One row: trucks (count of frozen trucks heading into trouble), value_eur, items (the list, joined with " | ").
+TRUCK_CARD = BASE_CSS + """
+<style>
+.cc{container-type:inline-size}
+.cc .tc{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
+.cc .tc.bad{border-left-color:#BD271E}
+.cc .tc .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .tc .big{font-size:clamp(22px,2.4cqw,34px);font-weight:700;line-height:1.1;display:inline-block;margin-right:12px}
+.cc .tc.bad .big{color:#BD271E}
+.cc .tc .sub{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
+.cc .tc .item{font-size:clamp(10px,1.05cqw,13px);margin:1px 0}
+.cc .tc.bad .item b{color:#BD271E}
+</style>
+{% assign n = 0 %}{% assign val = 0 %}{% assign items = "" %}
+{% for row in rows %}{% assign n = row["trucks"].value %}{% assign val = row["value_eur"].value %}{% assign items = row["items"].value %}{% endfor %}
+<div class="cc"><div class="tc{% if n > 0 %} bad{% endif %}">
+  <div class="lbl">Frozen trucks heading into trouble</div>
+  <span class="big">{{ n }}</span><span class="sub">{% if n > 0 %}EUR {{ val }} of frozen goods on their way to stores whose frozen cabinets are not safe to load. Normal: none.{% else %}No frozen delivery is heading to a store in trouble. Normal: none.{% endif %}</span>
+  {% if n > 0 %}{% assign list = items | split: " | " %}{% for it in list %}<div class="item"><b>{{ it }}</b></div>{% endfor %}{% endif %}
+</div></div>
+"""
 
 
 STORE_MAP_TPL = BASE_CSS + """
@@ -228,7 +252,13 @@ STORE_MAP_TPL = BASE_CSS + """
   <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
   <text x="490" y="46" font-size="11" fill="currentColor" opacity=".5" text-anchor="end">Baden</text>
   <text x="14" y="640" font-size="13" font-weight="700" fill="#9170B8" opacity=".8" letter-spacing="2">SWITZERLAND</text>
-  {% for row in rows %}
+  {% for row in rows %}{% if row["kind"].value == "truck" %}
+    {% assign risk = 0 %}{% assign dx = row["tx"].value %}{% assign dy = row["ty"].value %}{% assign dtown = "" %}
+    {% for st in rows %}{% if st["kind"].value == "store" and st["store"].value == row["dest"].value %}{% assign risk = st["bad_now"].value %}{% assign dx = st["x"].value %}{% assign dy = st["y"].value %}{% assign dtown = st["town"].value %}{% endif %}{% endfor %}
+    {% assign trouble = false %}{% if row["cargo"].value == "frozen" and risk >= @@BAD@@ %}{% assign trouble = true %}{% endif %}
+    <line x1="{{ row["tx"].value }}" y1="{{ row["ty"].value }}" x2="{{ dx }}" y2="{{ dy }}" stroke="{% if trouble %}#BD271E{% else %}#6092C0{% endif %}" stroke-width="{% if trouble %}2.5{% else %}1.4{% endif %}" stroke-dasharray="{% if trouble %}6 4{% else %}3 4{% endif %}" opacity="{% if trouble %}.95{% else %}.6{% endif %}"/>
+  {% endif %}{% endfor %}
+  {% for row in rows %}{% if row["kind"].value == "store" %}
   <g class="dot">
     {% if row["store"].value == "@@SEL@@" %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="18" fill="none" stroke="currentColor" stroke-width="3"/>{% endif %}
     {% if row["attacked"].value > 0 %}<circle class="pulse" cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" fill="#BD271E"/>{% endif %}
@@ -237,16 +267,31 @@ STORE_MAP_TPL = BASE_CSS + """
       <title>{{ row["store"].value }} {{ row["town"].value }}: {% if row["attacked"].value > 0 %}{{ row["attacked"].value }} cabinets at +50 C{% else %}all cabinets normal{% endif %}</title></circle>
     <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>
   </g>
-  {% endfor %}
+  {% endif %}{% endfor %}
+  {% for row in rows %}{% if row["kind"].value == "truck" %}
+    {% assign risk = 0 %}{% assign dtown = "" %}
+    {% for st in rows %}{% if st["kind"].value == "store" and st["store"].value == row["dest"].value %}{% assign risk = st["bad_now"].value %}{% assign dtown = st["town"].value %}{% endif %}{% endfor %}
+    {% assign trouble = false %}{% if row["cargo"].value == "frozen" and risk >= @@BAD@@ %}{% assign trouble = true %}{% endif %}
+  <g class="truck" transform="translate({{ row["tx"].value }},{{ row["ty"].value }})">
+    {% if trouble %}<circle class="pulse" r="14" fill="#BD271E"/>{% endif %}
+    <rect x="-12" y="-7" width="17" height="12" rx="2" fill="{% if trouble %}#BD271E{% elsif row["cargo"].value == "frozen" %}#2E6DA4{% elsif row["cargo"].value == "chilled" %}#00BFB3{% else %}#8C97A8{% endif %}" stroke="#fff" stroke-width="1.5"/>
+    <path d="M5 -4 H10 L13 0 V5 H5 Z" fill="#343741" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="-6" cy="6" r="2.4" fill="#343741" stroke="#fff" stroke-width="1"/><circle cx="8" cy="6" r="2.4" fill="#343741" stroke="#fff" stroke-width="1"/>
+    <text x="0" y="-12" text-anchor="middle" font-size="10" font-weight="700" fill="{% if trouble %}#BD271E{% else %}currentColor{% endif %}" stroke="#fff" stroke-width=".4" paint-order="stroke">{{ row["truck"].value | remove: "TRK-" }}</text>
+    <title>{{ row["truck"].value }} ({{ row["cargo"].value }}, cargo {{ row["cargo_temp"].value }} C, {{ row["pallets"].value }} pallets, EUR {{ row["value"].value }}), {{ row["status"].value }}. Next stop {{ row["dest"].value }} {{ dtown }}: planned in {{ row["eta"].value }} min (ERP {{ row["delivery"].value }}){% if trouble %}. The frozen cabinets there are not safe to load: {{ risk }} bad.{% endif %}</title>
+  </g>
+  {% endif %}{% endfor %}
   <g font-size="12" fill="currentColor"><circle cx="20" cy="@@LEGY@@" r="7" fill="#54B399"/><text x="34" y="@@LEGY@@" dy="4">normal</text>
     <circle cx="110" cy="@@LEGY@@" r="7" fill="#BD271E"/><text x="124" y="@@LEGY@@" dy="4">setpoints raised</text>
-    <circle cx="260" cy="@@LEGY@@" r="7" fill="#F5A700"/><text x="274" y="@@LEGY@@" dy="4">warm, no defrost</text></g>
-  <text x="490" y="670" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot for the town.</text>
+    <circle cx="260" cy="@@LEGY@@" r="7" fill="#F5A700"/><text x="274" y="@@LEGY@@" dy="4">warm, no defrost</text>
+    <rect x="14" y="@@LEG2@@" width="14" height="10" rx="2" fill="#2E6DA4"/><text x="34" y="@@LEG2@@" dy="9">delivery truck (frozen)</text>
+    <rect x="190" y="@@LEG2@@" width="14" height="10" rx="2" fill="#BD271E"/><text x="210" y="@@LEG2@@" dy="9">frozen truck heading into trouble</text></g>
+  <text x="490" y="670" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">Base map: Natural Earth (public domain). Hover a dot or a truck.</text>
 </svg>
-  {% for row in rows %}
+  {% for row in rows %}{% if row["kind"].value == "store" %}
   <a class="sd" style="left:{{ row["x"].value | divided_by: @@W@@ }}%;top:{{ row["y"].value | divided_by: @@H@@ }}%" title="Filter to {{ row["store"].value }} {{ row["town"].value }}"
      href="/app/dashboards#/view/coldchain-act1b-{{ row["store"].value | downcase }}"></a>
-  {% endfor %}
+  {% endif %}{% endfor %}
 </div></div>
 """
 

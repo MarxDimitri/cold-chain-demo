@@ -22,6 +22,7 @@ THRESHOLDS = {
     "cabinets-reporting": {"direction": "down", "red_below": 480},
     "cabinets-warm": {"direction": "up", "amber": 1, "red": 4},
     "open-alerts": {"direction": "up", "red": 1},
+    "trucks-at-risk": {"direction": "up", "red": 1},
 }
 
 
@@ -46,6 +47,7 @@ def measure(es) -> list[dict]:
         row("cabinets-warm", "level", 0, "cabinets",
             "measured: 0 false alarms of the warm-without-defrost logic over the 7 days of indexed telemetry (a measurement of the full version over 34 days: docs/decisions.md)", "Cabinets warm, no defrost"),
         row("open-alerts", "level", 0, "alerts", "design: no alerts in normal operation", "Open alerts"),
+        row("trucks-at-risk", "level", 0, "trucks", "design: no frozen delivery heads for a store whose frozen cabinets are not safe to load", "Frozen trucks heading into trouble"),
     ]
 
 

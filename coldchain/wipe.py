@@ -27,8 +27,8 @@ from .prep import STREAMS
 OLD_DASHBOARDS = ["coldchain-act1-estate", "coldchain-act4-evidence", "coldchain-act5a-history", "coldchain-act5b-history-frozen",
                   "coldchain-epilogue-edge"]
 RULES = ["coldchain-limits", "coldchain-warm-no-defrost", "coldchain-first-seen-peer"]
-STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-pos.terminal-*", "logs-network_traffic.tls-*"]
-TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-pos.terminal", "logs-network_traffic.tls")
+STREAM_PATTERNS = ["logs-coldchain.*", "metrics-coldchain.*", "logs-netflow.summary-*", "logs-pos.terminal-*", "logs-network_traffic.tls-*", "logs-logistics.truck-*"]
+TEMPLATE_PREFIXES = ("coldchain", "logs-coldchain", "metrics-coldchain", "logs-netflow.summary", "logs-pos.terminal", "logs-network_traffic.tls", "logs-logistics.truck")
 INDEX_PATTERNS = ["kb-*", "cc-history-audit*", "cc-hunt-findings", "cc-esql-moment", "test-coldchain-*", "zzcheck*"]
 PIPELINES = ["coldchain-route", hunt.PIPELINE]
 H = {"x-elastic-internal-origin": "Kibana", "elastic-api-version": "2023-10-31"}

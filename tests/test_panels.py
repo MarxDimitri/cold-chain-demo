@@ -5,7 +5,7 @@ import pytest
 
 from coldchain import panels
 
-TEMPLATES = {name: getattr(panels, name) for name in ("REALMS", "REALMS_LIT", "STORE_MAP", "FIRST_VISITS", "FINDINGS", "POS_EVIDENCE")}
+TEMPLATES = {name: getattr(panels, name) for name in ("REALMS", "REALMS_LIT", "STORE_MAP", "TRUCK_CARD", "FIRST_VISITS", "FINDINGS", "POS_EVIDENCE")}
 
 
 @pytest.mark.parametrize("name", TEMPLATES)

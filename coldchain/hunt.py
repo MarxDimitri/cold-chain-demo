@@ -36,11 +36,13 @@ Check at least these, with your tools:
 3. Device behaviour: devices talking to servers their profile does not allow, internal peers never seen before, unusual
    volume (compare with what is normal for that device role).
 4. Exposure: controllers reachable from the internet that the attacker has not touched yet.
+5. Logistics: frozen deliveries heading to a store whose frozen cabinets are not safe to load (ERP plan, truck telemetry and cabinet
+   telemetry together).
 
 Report one finding per type and store, never two for the same thing (a first visit seen both live and in the history is one
 finding, with the earliest time). The key is exactly `<type>:<store>` with the type from this list and the store id (for a
 group of stores use their ids joined with `+`, in order): first-visit, setpoint-change, forced-defrost, warm-cabinets,
-pos-download, internal-pivot, exposed-controllers. Examples: `first-visit:S07`, `setpoint-change:S11`,
+pos-download, internal-pivot, exposed-controllers, truck-at-risk (one finding per destination store, entities: truck and ERP delivery ids). Examples: `first-visit:S07`, `setpoint-change:S11`,
 `exposed-controllers:S03+S05+S09+S12+S14`. The same finding must get the same key on every run.
 List in `tools` the ids of the tools whose results support each finding (for example `cc_history_of_address`).
 Keep the text short, it is shown in a dashboard table: title at most 70 characters, proposed_action at most 120,
@@ -59,7 +61,7 @@ SCHEMA = {
                 "key": {"type": "string", "description": "Stable id of the finding, the same on every run"},
                 "title": {"type": "string", "description": "At most 70 characters"},
                 "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-                "category": {"type": "string", "enum": ["outside-access", "temperature", "device-behaviour", "exposure"]},
+                "category": {"type": "string", "enum": ["outside-access", "temperature", "device-behaviour", "exposure", "logistics"]},
                 "stores": {"type": "array", "items": {"type": "string"}},
                 "tools": {"type": "array", "items": {"type": "string"}, "description": "Ids of the tools whose results support this finding"},
                 "entities": {"type": "array", "items": {"type": "string"}, "description": "IP addresses, hosts, devices"},

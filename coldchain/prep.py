@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from .elastic import client
 
 STREAMS = ["logs-coldchain.audit-default", "metrics-coldchain.case-default", "logs-netflow.summary-default",
-           "logs-coldchain.probe-default"]
+           "logs-coldchain.probe-default", "logs-logistics.truck-default"]
 ROTATION = 10  # minutes per pre-roll file
 
 
@@ -29,6 +29,11 @@ def clean(since: str) -> None:
         r = es.delete_by_query(index=ix, query={"range": {"event.ingested": {"gte": since}}}, conflicts="proceed",
                                refresh=True, wait_for_completion=True)
         print(f"clean: {ix}: removed {r['deleted']} documents ingested since {since}")
+    try:  # the ERP plan of the run (its times are relative to that run's T0)
+        r = es.delete_by_query(index="kb-erp-deliveries", query={"match_all": {}}, conflicts="proceed", refresh=True)
+        print(f"clean: kb-erp-deliveries: removed {r['deleted']} delivery stops")
+    except Exception as e:  # the index may not exist yet
+        print(f"clean: kb-erp-deliveries: skipped ({type(e).__name__})")
     r = es.delete_by_query(index=".alerts-security.alerts-default", conflicts="proceed", refresh=True, wait_for_completion=True,
                            query={"bool": {"filter": [{"range": {"@timestamp": {"gte": since}}},
                                                       {"prefix": {"kibana.alert.rule.name": "Cold chain:"}}]}})

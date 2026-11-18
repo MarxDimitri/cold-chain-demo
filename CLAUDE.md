@@ -2,7 +2,7 @@
 > `README.md` win. Differences: **Elastic Cloud Serverless** (Security project), not Hosted; **no data federation** and no
 > frozen tier (a year of history is indexed); **POS systems** replace the TV boxes (a back-office POS PC and 4 lanes per store, the
 > `pos` namespace: `logs-netflow.summary-pos`, `logs-pos.terminal-pos`, `logs-network_traffic.tls-pos`); six dashboards built with
-> Serverless **custom panels**, no ES|QL explanations; a **15-minute** story (`docs/story-flow.md`). The full version is the git tag
+> Serverless **custom panels**, no ES|QL explanations; a **15-minute** story (`docs/story-flow.md`); Act 2 adds **delivery trucks** (telemetry `logs-logistics.truck-default`, ERP plan `kb-erp-deliveries`, `docs/logistics-story.md`). The full version is the git tag
 > `v1-ech-federation-tv`. Sections 3.2, 4.4, 6.6, 8.3 to 8.5 and 12 below describe that full version.
 
 # Cold-chain demo: implementation brief (edge + data federation on AWS S3)

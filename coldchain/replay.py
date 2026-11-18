@@ -30,6 +30,7 @@ from .chain import ROOT, load_attack, load_chain, parse_ts
 from .netflow import Exporter
 from .network import WINDOW, flows
 from .sink import make_sink, write_chunk, write_records
+from . import trucks
 from .telemetry import PROBE_STEP, evaporator_series, probe_line, probe_offsets, store_series, telemetry_line
 
 STATE_DIR = ROOT / ".replay"
@@ -38,7 +39,7 @@ S07_DIR = ROOT / "replay" / "s07"
 PREROLL = 180  # seconds before T0 (logins land at T0-140s)
 TAIL = 300     # seconds of data after the pull-down ends
 LAYERS = {"coldchain.case": ("detect",), "coldchain.probe": ("detect",), "coldchain.audit": ("detect",),
-          "netflow.summary": ("detect",), "netflow.log": ()}  # raw flows are generated for the attack plan but not written
+          "netflow.summary": ("detect",), "netflow.log": (), "logistics.truck": ("detect",)}  # raw flows are generated for the attack plan but not written
 
 
 class Replay:
@@ -114,6 +115,24 @@ class Replay:
         (STATE_DIR / "state.json").write_text(json.dumps({"t0": iso(self.t0), "restore": iso(restore_t)}))
         print(f"  restore issued at {iso(restore_t)} (T0+{(restore_t - self.t0) / 60:.1f} min)", flush=True)
 
+    def load_erp(self) -> None:
+        """Write the delivery plan as the ERP holds it (kb-erp-deliveries) with planned arrivals relative to T0."""
+        from .elastic import client
+        from elasticsearch import helpers
+        es = client()
+        rows = trucks.erp_rows(self.t0)
+        helpers.bulk(es, ({"_index": "kb-erp-deliveries", "_id": r["kb"]["key"], "_source": r} for r in rows), refresh="wait_for")
+        print(f"  ERP: {len(rows)} delivery stops loaded", flush=True)
+
+    def push_trucks(self, fleet, m: int, history: bool = False) -> None:
+        """One telemetry record per truck and minute; on the first step also the HISTORY_MIN minutes before, so they are on the road."""
+        first = m - trucks.HISTORY_MIN * 60 if history else m
+        for mm in range(first, m + 1, 60):
+            for tr in fleet:
+                line = trucks.telemetry_line(tr, (mm - self.t0) / 60, iso(mm), self.rng)
+                if line:
+                    self.push(m + 59, "logistics.truck", "LOG", line, ts=mm)
+
     def push_normal_flows(self, wstart: int) -> None:
         for store in self.chain.stores:
             _, summary = flows(self.chain, store, wstart, 0, self.args.seed, windows=1)
@@ -174,6 +193,9 @@ class Replay:
         targets = {c.id for _, c in p.targets()}
         self.wait_until(self.start)
         self.push_attack()
+        fleet = trucks.build()
+        if a.target == "s3":  # the ERP delivery plan, with planned arrivals relative to this run's T0
+            self.load_erp()
 
         try:
             for step in range((self.end - self.begin) // 60):
@@ -188,6 +210,7 @@ class Replay:
                             self.push_restore(self.t0 + a.restore_timeout * 60)
                 if m % WINDOW == 0:
                     self.push_normal_flows(m)
+                self.push_trucks(fleet, m, history=step == 0)
 
                 i = (m - series_start) // 60
                 for store in self.chain.stores:

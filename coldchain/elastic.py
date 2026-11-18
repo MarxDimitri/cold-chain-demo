@@ -38,6 +38,7 @@ DATASETS = {
     "coldchain.probe": ("logs", ["info"]),  # independent temperature loggers, outside the controller's trust
     "netflow.summary": ("logs", ["connection", "info"]),
     "pos.terminal": ("logs", ["info"]),  # POS scenario: hourly roll-ups per POS terminal (CPU, disk, transactions per minute)
+    "logistics.truck": ("logs", ["info"]),  # truck telemetry: GPS, speed, cargo temperature (destination is in the ERP)
     "network_traffic.tls": ("logs", ["connection", "info"]),  # POS scenario: TLS sessions of the S07 back-office POS
 }
 
@@ -85,6 +86,8 @@ CUSTOM_MAPPINGS = {
                 "tx_per_min": {"type": "float"},
             }},
             "independent": {"type": "boolean"},
+            "truck": {"properties": {"id": kw(), "cargo": kw(), "status": kw(), "speed_kmh": {"type": "float"}, "heading": {"type": "integer"},
+                                     "cargo_temp": {"type": "float"}, "reefer_setpoint": {"type": "float"}}},
         }},
     },
 }
@@ -162,7 +165,7 @@ def setup(es: Elasticsearch) -> None:
 
 
 LOOKUP_FILES = ["kb-assets", "kb-assets-by-ip", "kb-controller-limits", "kb-device-profiles", "kb-manuals",
-                "kb-regulations", "kb-baselines"]
+                "kb-regulations", "kb-baselines", "kb-erp-deliveries"]
 
 
 def lookups(es: Elasticsearch) -> None:

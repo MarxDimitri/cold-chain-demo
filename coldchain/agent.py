@@ -5,7 +5,7 @@
     python -m coldchain.agent ask [QUESTION]   # ask the agent (needs an LLM connector on the deployment)
     python -m coldchain.agent delete
 
-Nine ES|QL tools, one per step of the hunt. They read the indexed streams (the blip, a year of audit history, the POS evidence)
+Ten ES|QL tools, one per step of the hunt. They read the indexed streams (the blip, a year of audit history, the POS evidence)
 and the knowledge base (what is normal). The agent proposes containment; it does not change anything. Agent Builder is a
 preview feature: say so on stage.
 """
@@ -15,6 +15,7 @@ import argparse
 import json
 import sys
 
+from . import trucks
 from .dashboards import NOMINAL, kibana
 
 ATTACKER = "203.0.113.0/24"
@@ -112,6 +113,14 @@ TOOLS = [
 | STATS first_seen = MIN(@timestamp), flows = COUNT(*) BY host.name, source.ip, destination.ip, destination.port
 | SORT first_seen DESC
 | LIMIT 10"""},
+    {"id": "cc_trucks_at_risk",
+     "description": "Logistics, live: frozen deliveries on their way to a store whose frozen cabinets are not safe to load right now "
+                    "(at least 8 frozen cabinets with the setpoint raised or the air above -18 C and no defrost). One query over three "
+                    "sources: the cabinet telemetry, the truck telemetry (position, cargo temperature) and the ERP delivery plan. "
+                    "Returns per truck and stop: the store, how many frozen cabinets are bad, kilometres to go, minutes to the planned "
+                    "arrival, the ERP delivery id, pallets, cargo value in euros and the cargo temperature. The truck itself is cold: the risk is the store.",
+     "params": {},
+     "query": trucks.at_risk_query()},
     {"id": "cc_what_is_normal",
      "description": "Knowledge base: the documented range and the curated normal range of a controller parameter, with the manual page.",
      "params": {"code": {"type": "string", "description": "parameter code: setpoint, A13, A03"}},
@@ -132,7 +141,12 @@ the live detections, a year of audit history and the in-store network, and you a
 3. THE STORE. For the store whose change came from inside, call cc_internal_movement and cc_device_evidence. Say which device
    it was (a back-office POS PC), what it downloaded and from which server, over how many nights, and how it reached the system
    manager. A POS device reaching the refrigeration controller means nothing separates the two on that store network: say so.
-4. WHAT IS NEXT. Call cc_exposed_controllers and subtract the stores already touched: every store with an outside login
+4. THE TRUCKS. Call cc_trucks_at_risk. The ERP says which frozen deliveries are planned for which store, the truck telemetry says
+   where each truck is and that its cargo is still cold, and the cabinet telemetry says the destination's frozen cabinets are not safe to load.
+   Say which trucks (id, ERP delivery id), to which store, how many minutes to the planned arrival and how many kilometres to go,
+   the pallets and value in euros, and that the cargo is cold but the store is not. Propose: hold or reroute the delivery, or unload into the
+   store's cold room instead of the cabinets; the logistics team decides. If the tool returns nothing, say no frozen delivery is heading to a store in trouble.
+5. WHAT IS NEXT. Call cc_exposed_controllers and subtract the stores already touched: every store with an outside login
    (cc_recent_outside_logins, live) or in cc_history_of_address or cc_estate_footprint (history, may lag a running attack). Name the stores still at risk and the
    shared contractor account. Propose containment (block the address, isolate the device, review the account, restore setpoints
    after the contractor approves). You never run containment yourself.
@@ -142,7 +156,7 @@ Rules: use the tools, never guess numbers or causes (do not name how the attacke
 announce that you are about to answer and never describe your plan."""
 
 DEFAULT_QUESTION = ("Something changed temperature setpoints in our stores. What happened, how long has the attacker been in, "
-                    "how did it happen inside the store, and which stores are next?")
+                    "how did it happen inside the store, which stores are next, and are any deliveries heading into trouble?")
 
 SAMPLE = {"minutes": 100000, "ip": "203.0.113.47", "store": "S07", "code": "setpoint"}
 
