@@ -325,29 +325,30 @@ def act1() -> Dash:
          "AND coldchain.case.setpoint > 5 BY store = retail.store.id | SORT store")
     custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
     d.row(9)
-    # One query over telemetry and audit. The setpoint changes are vertical bars on the right axis: warming (raised) red, cooling
-    # (lowered) blue, stacked; the lines are the hottest and coolest store (median cabinet).
-    q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
-         f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL}, "
-         'change = event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" '
-         "| STATS typical = MEDIAN(warm), "
-         "up = COUNT(*) WHERE change AND coldchain.parameter.value.new > coldchain.parameter.value.old, "
-         "down = COUNT(*) WHERE change AND coldchain.parameter.value.new < coldchain.parameter.value.old "
-         "BY t = BUCKET(@timestamp, 5 minutes), retail.store.id "
-         "| STATS hottest = ROUND(MAX(typical), 1), coolest = ROUND(MIN(typical), 1), "
-         "warming = SUM(up), cooling = SUM(down) BY t | SORT t")
-    cfg = {"type": "xy",
-           "layers": [{"type": "bar_stacked", "data_source": esql(q), "x": {"column": "t"},
-                       "y": [{"column": "warming", "axis": "y2", "color": {"type": "static", "color": RED}},
-                             {"column": "cooling", "axis": "y2", "color": {"type": "static", "color": "#6092C0"}}]},
-                      {"type": "line", "data_source": esql(q), "x": {"column": "t"},
-                       "y": [{"column": "hottest"}, {"column": "coolest"}]}],
-           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "K above nominal", "visible": True}},
-                    "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
-           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and parameter changes", cfg, 48, 12,
-          query=q)
+    # The estate warms: hottest and coolest store (median cabinet) as lines.
+    q = (f"FROM metrics-coldchain.case-* | WHERE {T} AND @timestamp <= NOW() "
+         f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL} "
+         "| STATS typical = MEDIAN(warm) BY t = BUCKET(@timestamp, 5 minutes), retail.store.id "
+         "| STATS hottest = ROUND(MAX(typical), 1), coolest = ROUND(MIN(typical), 1) BY t | SORT t")
+    lines(d, "The estate warms as the setpoints change: hottest and coolest store (median cabinet)", q, "t", ["hottest", "coolest"],
+          w=48, h=12, ytitle="K above nominal")
     d.row(12)
+    # The setpoint changes as vertical bars on a time strip; the hover text names the stores, cabinets, user and source.
+    q = (f'FROM logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() AND event.action == "parameter-change" '
+         'AND coldchain.parameter.code == "setpoint" '
+         '| EVAL dir = CASE(coldchain.parameter.value.new > coldchain.parameter.value.old, "up", "down"), '
+         'cab = SUBSTRING(device.id, 5), src = TO_STRING(source.ip) '
+         "| STATS n = COUNT(*), cabs = MV_CONCAT(MV_SORT(VALUES(cab)), \", \"), by_user = MV_CONCAT(VALUES(user.name), \", \"), "
+         "from_ip = MV_CONCAT(VALUES(src), \", \") BY t = BUCKET(@timestamp, 5 minutes), dir, store = retail.store.id "
+         '| EVAL line = CONCAT(store, " (", TO_STRING(n), ") ", cabs, " by ", by_user, " from ", from_ip) '
+         '| STATS total = SUM(n), detail = MV_CONCAT(MV_SORT(VALUES(line)), " | ") BY t, dir '
+         "| INLINE STATS mx = MAX(total) "
+         '| EVAL pct = ROUND(DATE_DIFF("minutes", ?_tstart, t) * 100.0 / DATE_DIFF("minutes", ?_tstart, ?_tend), 2), '
+         'h = ROUND(total * 100.0 / mx, 1), when = DATE_FORMAT("MM-dd HH:mm", t), '
+         'from_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tend) '
+         "| SORT t | KEEP t, dir, total, detail, pct, h, when, from_lbl, to_lbl")
+    custom(d, "Setpoint changes", q, panels.SETPOINT_BARS, w=48, h=7, show_title=False)
+    d.row(7)
     table(d, "Latest parameter changes",
           f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
           "| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT(\"MM-dd HH:mm\", @timestamp) "

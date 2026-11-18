@@ -182,6 +182,33 @@ ESTATE_TILES = BASE_CSS + """
 """
 
 
+# Act 2: setpoint changes as vertical bars on a time strip. Rows: t, dir (up/down), total, detail, pct (x position, %), h (height, %).
+SETPOINT_BARS = BASE_CSS + """
+<style>
+.cc .sb{position:relative;height:130px;border-bottom:2px solid rgba(128,128,128,.6);margin:6px 6px 0 6px;
+  background:repeating-linear-gradient(to right,rgba(128,128,128,.12) 0,rgba(128,128,128,.12) 1px,transparent 1px,transparent 12.5%)}
+.cc .sb a{position:absolute;bottom:0;width:.45%;min-width:7px;border-radius:2px 2px 0 0;cursor:help;display:block}
+.cc .sb a.up{background:#BD271E}
+.cc .sb a.down{background:#6092C0}
+.cc .sb a:hover{outline:2px solid currentColor}
+.cc .sbx{display:flex;justify-content:space-between;margin:2px 6px;font-size:11px;opacity:.75}
+.cc .sbl{margin:4px 6px;font-size:12px}
+.cc .sbl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 12px}
+</style>
+<div class="cc">
+<div class="sbl"><b>Setpoint changes</b><i style="background:#BD271E"></i>raised (warming)<i style="background:#6092C0"></i>lowered (cooling)
+  <span class="muted"> &middot; hover a bar for the stores and cabinets</span></div>
+<div class="sb">
+{% for row in rows %}
+<a class="{{ row["dir"].value }}" style="left:{% if row["dir"].value == "down" %}{{ row["pct"].value | plus: 0.5 }}{% else %}{{ row["pct"].value }}{% endif %}%;height:{{ row["h"].value }}%"
+   title="{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}. {{ row["detail"].value }}"></a>
+{% endfor %}
+</div>
+<div class="sbx">{% for row in rows %}{% if forloop.first %}<span>{{ row["from_lbl"].value }}</span><span>{{ row["to_lbl"].value }}</span>{% endif %}{% endfor %}</div>
+</div>
+"""
+
+
 STORE_GRID = BASE_CSS + """
 <style>
 .cc-stores{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
