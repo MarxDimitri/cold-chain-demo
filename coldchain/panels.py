@@ -221,7 +221,7 @@ HISTORY_MAP = BASE_CSS + """
 .cc .bub{cursor:default}
 .cc .bub:hover circle{stroke-width:4}
 </style>
-<div class="cc"><div class="zbar"><span class="muted">Admin logins per store, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }}{% endif %}{% endfor %} (bubble size: number of logins)</span></div><div class="map">
+<div class="cc"><div class="zbar"><span class="muted">Admin logins per store, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }}{% endif %}{% endfor %} (bubble: all admin logins, red share: from an outside address)</span></div><div class="map">
 <svg viewBox="@@VB@@" width="100%" role="img" aria-label="Admin logins per store">
   @@BASE@@
   <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
@@ -229,15 +229,18 @@ HISTORY_MAP = BASE_CSS + """
   <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
   {% for row in rows %}
   <g class="bub">
-    {% if row["outside"].value > 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | plus: 7 }}" fill="none" stroke="#BD271E" stroke-width="3"/>{% endif %}
-    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" stroke="#fff" stroke-width="2.5" fill="{% if row["outside"].value > 0 %}#BD271E{% else %}#6092C0{% endif %}" fill-opacity=".92">
-      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in this period{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first in this period on {{ row["first_outside_txt"].value }}{% else %}, all from contractor addresses{% endif %}</title></circle>
+    {% assign circ = row["r"].value | times: 3.14159 %}{% assign dash = circ | times: row["outside"].value | divided_by: row["logins"].value %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | plus: 2 }}" fill="#fff"/>
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" fill="#6092C0"/>
+    {% if row["outside"].value > 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | divided_by: 2.0 }}" fill="none" stroke="#BD271E" stroke-width="{{ row["r"].value }}" stroke-dasharray="{{ dash }} {{ circ }}" transform="rotate(-90 {{ row["x"].value }} {{ row["y"].value }})"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" fill="transparent">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in this period: {{ row["logins"].value | minus: row["outside"].value }} from contractors and store LANs{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first in this period on {{ row["first_outside_txt"].value }}{% endif %}</title></circle>
     <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["logins"].value }}</text>
   </g>
   {% endfor %}
   <rect x="8" y="@@LEGBOX@@" width="420" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
-  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">contractor logins</text>
-    <circle cx="190" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="204" y="@@LEGY@@" dy="4.5">an outside address logged in</text></g>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">contractor or store LAN</text>
+    <circle cx="204" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="218" y="@@LEGY@@" dy="4.5">outside address</text></g>
   <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>
 </svg></div></div>
 """

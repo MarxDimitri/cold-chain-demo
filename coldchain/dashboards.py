@@ -427,8 +427,10 @@ def history_map_query() -> str:
 
 def history_tiles_query() -> str:
     parts = [
-        (1, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} | STATS value = COUNT(*) "
-            '| EVAL label = "Admin logins", note = "all stores, in the selected period", state = "green"'),
+        (1, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} | EVAL is_out = {OUTSIDE} "
+            "| STATS value = COUNT(*), outside = COUNT(*) WHERE is_out "
+            '| EVAL label = "Admin logins", note = CONCAT(TO_STRING(value - outside), " from contractors and store LANs, ", TO_STRING(outside), '
+            '" from outside addresses"), state = "green" | KEEP value, label, note, state'),
         (2, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT(*) "
             '| EVAL label = "Logins from outside addresses", note = "Normal: 0 (contractors and store LANs only)", '
             'state = CASE(value > 0, "red", "green")'),
