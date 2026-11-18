@@ -349,13 +349,17 @@ def act1() -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": "K above nominal (hottest and coolest store)", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 30, 14, query=q)
-    tbl = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
-           '| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT("MM-dd HH:mm", @timestamp), '
-           'change = CONCAT(TO_STRING(coldchain.parameter.value.old), " -> ", TO_STRING(coldchain.parameter.value.new)) '
-           "| RENAME retail.store.id AS store, device.id AS cabinet, user.name AS user, source.ip AS source "
-           "| KEEP time, store, cabinet, user, source, change")
-    table(d, "Latest parameter changes", tbl, ["time", "store", "cabinet", "user", "source", "change"], w=18, h=14, x=30)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 14, query=q)
+    # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
+    # next to the 46 changes and the 46 restores.
+    tbl = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action IN ("logged-in", "parameter-change") '
+           '| EVAL what = CASE(event.action == "logged-in", "logged in", '
+           'CONCAT("setpoint ", TO_STRING(coldchain.parameter.value.old), " -> ", TO_STRING(coldchain.parameter.value.new))), '
+           "src = TO_STRING(source.ip) "
+           "| STATS n = COUNT(*), t = MAX(@timestamp) BY m = BUCKET(@timestamp, 1 minute), store = retail.store.id, user = user.name, src, what "
+           '| SORT t DESC | LIMIT 60 | EVAL time = DATE_FORMAT("MM-dd HH:mm:ss", t), what = CASE(n > 1, CONCAT(what, " x", TO_STRING(n)), what) '
+           "| RENAME src AS source | KEEP time, store, user, source, what")
+    table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=20, h=14, x=28)
     d.row(14)
     return d
 
