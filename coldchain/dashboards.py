@@ -348,8 +348,8 @@ def act1() -> Dash:
            f'| EVAL kind = "ev", x = {x}, when = DATE_FORMAT("MM-dd HH:mm", t) | KEEP kind, t, x, dir, total, detail, when)')
     q = (f"FROM {pts}, {evs} "
          '| EVAL from_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tend) | SORT kind, t')
-    custom(d, "The estate warms as the setpoints change", q, panels.ESTATE_CHART, w=48, h=20, show_title=False)
-    d.row(20)
+    custom(d, "The estate warms as the setpoints change", q, panels.ESTATE_CHART, w=48, h=21, show_title=False)
+    d.row(21)
     table(d, "Latest parameter changes",
           f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
           "| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT(\"MM-dd HH:mm\", @timestamp) "
