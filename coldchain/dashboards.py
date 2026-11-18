@@ -70,26 +70,42 @@ ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch
         ("coldchain-act3-history", "Act 3", "The history nobody looked at"),
         ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
         ("coldchain-pos-evidence", "Act 5", "The POS lead")]
-NAV_HEIGHT = 3
+NAV_HEIGHT = 2
 
-
-def _link(i: int) -> str:
-    did, label, words = ACTS[i]
-    return f"[**{label}** {words}](/app/dashboards#/view/{did})"
+NAV_CSS = """<style>
+.cc-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;padding:0 2px}
+.cc-nav a{color:inherit;text-decoration:none;opacity:.7}
+.cc-nav a:hover{opacity:1;text-decoration:underline}
+.cc-nav .side{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-nav .side.r{text-align:right}
+.cc-nav .steps{display:flex;gap:6px;align-items:center}
+.cc-nav .step{display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:50%;
+  border:1px solid rgba(128,128,128,.45);font-size:11px;opacity:.75}
+.cc-nav .step:hover{opacity:1;background:rgba(128,128,128,.22);text-decoration:none}
+.cc-nav .step.cur{background:#69707D;border-color:#69707D;color:#fff;opacity:1;font-weight:700}
+</style>"""
 
 
 def nav_panel(dash_id: str) -> dict | None:
-    """A strip with links to the previous and next act, and to every act."""
+    """A quiet strip: small previous and next links on the sides and one numbered dot per act in the middle."""
     ids = [a[0] for a in ACTS]
     if dash_id not in ids:
         return None
     i = ids.index(dash_id)
-    prev = f"\u25C0 {_link(i - 1)}" if i > 0 else "&nbsp;"
-    nxt = f"{_link(i + 1)} \u25B6" if i < len(ACTS) - 1 else "&nbsp;"
-    strip = " \u00B7 ".join(f"**{a[1]}**" if j == i else f"[{a[1]}](/app/dashboards#/view/{a[0]})" for j, a in enumerate(ACTS))
-    return {"type": "markdown", "grid": {"x": 0, "y": 0, "w": 48, "h": NAV_HEIGHT},
-            "config": {"content": f"{prev} &nbsp;&nbsp;|&nbsp;&nbsp; {strip} &nbsp;&nbsp;|&nbsp;&nbsp; {nxt}",
-                       "settings": {"open_links_in_new_tab": True}}}
+
+    def side(j: int, arrow_first: bool, cls: str) -> str:
+        if not 0 <= j < len(ACTS):
+            return f'<span class="side {cls}"></span>'
+        did, label, words = ACTS[j]
+        text = f"\u2039 {label}: {words}" if arrow_first else f"{label}: {words} \u203A"
+        return f'<span class="side {cls}"><a href="/app/dashboards#/view/{did}">{text}</a></span>'
+
+    dots = "".join(
+        f'<a class="step{" cur" if j == i else ""}" title="{a[1]}: {a[2]}" href="/app/dashboards#/view/{a[0]}">{a[1].split()[1]}</a>'
+        for j, a in enumerate(ACTS))
+    html = f'{NAV_CSS}<div class="cc-nav">{side(i - 1, True, "l")}<span class="steps">{dots}</span>{side(i + 1, False, "r")}</div>'
+    return {"type": "custom_content", "grid": {"x": 0, "y": 0, "w": 48, "h": NAV_HEIGHT},
+            "config": {"template": html, "esql_query": ["ROW x = 1"]}}
 
 
 def esql(q: str) -> dict:
