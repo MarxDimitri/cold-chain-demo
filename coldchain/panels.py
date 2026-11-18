@@ -190,7 +190,10 @@ STORE_MAP = BASE_CSS + """
 .cc .map svg{display:block}
 .cc .dot{cursor:default}
 .cc .dot:hover circle{stroke-width:4}
-@keyframes ccpulse{0%{r:12;opacity:.55}100%{r:30;opacity:0}}
+@keyframes ccpulse{
+  0%{r:12;opacity:.55}
+  100%{r:30;opacity:0}
+}
 .cc .pulse{animation:ccpulse 1.8s ease-out infinite}
 </style>
 <div class="cc"><div class="map">
