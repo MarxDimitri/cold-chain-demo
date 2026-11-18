@@ -295,6 +295,23 @@ def cabinet_tiles(cab: str = "S07-C05") -> str:
 CABINET_TILES = cabinet_tiles()
 
 
+def _person(x: int, y: int, color: str, basket: bool = False) -> str:
+    """A small shopper seen from the front (head, body, legs), top-left of its 26 px tall box at (x, y)."""
+    b = (f'<rect x="{x + 8}" y="{y + 15}" width="9" height="7" rx="1.5" fill="none" stroke="{color}" stroke-width="1.6"/>' if basket else "")
+    return (f'<g><circle cx="{x}" cy="{y + 4}" r="4.6" fill="#E9C9A5"/>'
+            f'<rect x="{x - 6}" y="{y + 9}" width="12" height="11" rx="5" fill="{color}"/>'
+            f'<path d="M{x - 2.5} {y + 20}v6M{x + 2.5} {y + 20}v6" stroke="#4A4F5C" stroke-width="2.4" stroke-linecap="round"/>{b}</g>')
+
+
+def _shoppers() -> str:
+    """People on the sales floor: in the aisles, at the shelves and queueing at the checkout."""
+    col = ["#E7664C", "#6092C0", "#54B399", "#9170B8", "#F5A700", "#D36086"]
+    spots = [(190, 374, 0, 1), (318, 374, 1, 0), (452, 374, 2, 1), (590, 374, 3, 0),
+             (250, 190, 4, 0), (520, 190, 5, 1),
+             (452, 424, 0, 0), (486, 424, 1, 1), (520, 424, 2, 0), (554, 424, 3, 0)]
+    return "<g>" + "".join(_person(x, y, col[c], bool(b)) for x, y, c, b in spots) + "</g>"
+
+
 _LAYOUT_TPL = BASE_CSS + """
 {% assign changes = 0 %}{% assign logins = 0 %}{% assign events = 0 %}{% assign readings = 0 %}{% assign attacked = 0 %}
 {% assign f_sm = 0 %}{% assign f_srv = 0 %}{% assign f_lane = 0 %}{% assign f_bo = 0 %}{% assign f_total = 0 %}
@@ -375,6 +392,7 @@ _LAYOUT_TPL = BASE_CSS + """
     <text x="567" y="285">🍷</text><text x="622" y="285">🥫</text><text x="595" y="335">💧</text>
   </g>
 
+  @@PEOPLE@@
   <g fill="#69707D"><rect x="672" y="248" width="26" height="16" rx="3"/><polygon points="698,252 710,246 710,266 698,260"/>
   <rect x="672" y="332" width="26" height="16" rx="3"/><polygon points="698,336 710,330 710,350 698,344"/></g>
   <text x="682" y="286" font-size="11" fill="currentColor" opacity=".75">3 cameras</text>
@@ -422,7 +440,7 @@ def store_layout(cab: str = "S07-C05") -> str:
                'Click a cabinet number to look at it.</text>')
     else:
         cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline) selected.</text>')
-    return _LAYOUT_TPL.replace("@@SEL@@", cab).replace("@@CAPTION@@", cap)
+    return _LAYOUT_TPL.replace("@@PEOPLE@@", _shoppers()).replace("@@SEL@@", cab).replace("@@CAPTION@@", cap)
 
 
 STORE_LAYOUT = store_layout()
