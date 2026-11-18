@@ -410,46 +410,50 @@ def act1(store: str | None = None) -> Dash:
 # --- Act 3: the history nobody looked at ---------------------------------------------------------------------------------
 
 ADMIN = 'event.action == "logged-in" AND user.name == "admin"'
-OUTSIDE = 'NOT CIDR_MATCH(source.ip, "198.51.100.0/24") AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")'
+OUTSIDE = 'NOT CIDR_MATCH(source.ip, "198.51.100.0/24") AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")'  # neither a contractor nor a store LAN
+# a hit: a setpoint raised above 5 C by an address that is not a contractor's (the warming attack; the contractors' own changes are excluded)
+HIT = ('event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" AND coldchain.parameter.value.new > 5 '
+       'AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24")')
+
+
+def history_per_store() -> str:
+    """Per store, in the picker's period: admin logins, how many came from an unknown address, setpoint hits, and the first time of each."""
+    return (f"FROM logs-coldchain.audit-default | WHERE {T} AND (({ADMIN}) OR ({HIT})) "
+            f"| EVAL adm = {ADMIN}, out = adm AND {OUTSIDE}, hit = {HIT}, ip = TO_STRING(source.ip) "
+            "| STATS logins = COUNT(*) WHERE adm, outside = COUNT(*) WHERE out, hit_cabs = COUNT_DISTINCT(device.id) WHERE hit, "
+            "first_outside = MIN(@timestamp) WHERE out, first_hit = MIN(@timestamp) WHERE hit, ips = VALUES(ip) WHERE out "
+            "BY store = retail.store.id")
 
 
 def history_map_query() -> str:
-    """Per store: admin logins in the period, how many came from an outside address, from where, and the first time."""
-    return (f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} "
-            f"| EVAL is_out = {OUTSIDE}, ip = TO_STRING(source.ip) "
-            "| STATS logins = COUNT(*), outside = COUNT(*) WHERE is_out, first_outside = MIN(@timestamp) WHERE is_out, "
-            "ips = VALUES(ip) WHERE is_out BY store = retail.store.id "
-            "| INLINE STATS most = MAX(logins), least = MIN(logins) "
-            '| EVAL r = ROUND(9 + 6 * (logins - least) / TO_DOUBLE(CASE(most > least, most - least, 1)), 1), first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), from_ip = MV_CONCAT(ips, ", "), '
+    """One row per store (all 20, even without events): status hit, visited (an unknown address logged in as admin, nothing changed yet)
+    or clear, with the dates, the address and the lead time between the first unknown login and the first hit."""
+    return (f'FROM ({history_per_store()}), (FROM kb-assets | WHERE retail.device.role == "system-manager" | EVAL store = retail.store.id | KEEP store) '
+            "| STATS logins = MAX(logins), outside = MAX(outside), hit_cabs = MAX(hit_cabs), first_outside = MIN(first_outside), "
+            "first_hit = MIN(first_hit), ips = VALUES(ips) BY store "
+            "| EVAL logins = COALESCE(logins, 0), outside = COALESCE(outside, 0), hit_cabs = COALESCE(hit_cabs, 0), "
+            'status = CASE(hit_cabs > 0, "hit", outside > 0, "visited", "clear"), '
+            'lead_days = CASE(outside > 0 AND hit_cabs > 0 AND first_hit > first_outside, DATE_DIFF("days", first_outside, first_hit), -1), '
+            'first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), first_hit_txt = DATE_FORMAT("yyyy-MM-dd", first_hit), '
+            'from_ip = MV_CONCAT(ips, ", "), '
             'from_lbl = DATE_FORMAT("yyyy-MM-dd", ?_tstart), to_lbl = DATE_FORMAT("yyyy-MM-dd", ?_tend), '
             f"{geo_cases()} | SORT store")
 
 
 def history_tiles_query() -> str:
-    parts = [
-        (1, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} | EVAL is_out = {OUTSIDE} "
-            "| STATS value = COUNT(*), outside = COUNT(*) WHERE is_out "
-            '| EVAL label = "Admin logins", note = CONCAT(TO_STRING(value - outside), " from contractors and store LANs, ", TO_STRING(outside), '
-            '" from outside addresses"), state = "green" | KEEP value, label, note, state'),
-        (2, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT(*) "
-            '| EVAL label = "Logins from outside addresses", note = "Normal: 0 (contractors and store LANs only)", '
-            'state = CASE(value > 0, "red", "green")'),
-        (3, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT_DISTINCT(retail.store.id) "
-            '| EVAL label = "Stores an outsider reached", note = "Normal: 0", state = CASE(value > 0, "red", "green")'),
-        (4, f"FROM logs-coldchain.audit-default | WHERE @timestamp >= NOW() - 365 days AND {ADMIN} AND {OUTSIDE} | STATS first_t = MIN(@timestamp) "
-            '| EVAL value = TO_LONG(DATE_DIFF("days", first_t, NOW())), label = "Days since the first outside login (12 months)", '
-            'note = CONCAT("First on ", DATE_FORMAT("yyyy-MM-dd", first_t), " (always the full year). Normal: none"), state = CASE(value >= 0, "red", "green") '
-            "| KEEP value, label, note, state"),
-    ]
-    union = ", ".join(f"({q} | EVAL ord = {o})" for o, q in parts)
-    return f"FROM {union} | SORT ord | KEEP ord, label, value, note, state"
+    """One row for the four cards, from the same per-store numbers as the map."""
+    return (f"{history_per_store()} "
+            "| STATS visited = COUNT(*) WHERE outside > 0, hit_stores = COUNT(*) WHERE hit_cabs > 0, "
+            "next_stores = COUNT(*) WHERE outside > 0 AND hit_cabs == 0, outside_logins = SUM(outside), all_logins = SUM(logins), "
+            "first_outside = MIN(first_outside) "
+            '| EVAL first_txt = DATE_FORMAT("yyyy-MM-dd", first_outside)')
 
 
 def act3() -> Dash:
     d = Dash("coldchain-act3-history", "Act 3: The history nobody looked at",
-             "Where the shared admin account logged in during the last 12 months. The same internet address visited three stores months before the attack. Synthetic data.",
+             "Which stores an unknown address logged in to as admin in the last 12 months, and which of them the warming attack has hit. Synthetic data.",
              time=("now-1y", "now"))
-    custom(d, "Where admin logged in", history_map_query(), panels.history_map(), w=20, h=28, show_title=False)
+    custom(d, "Stores visited by an unknown address", history_map_query(), panels.history_map(), w=20, h=28, show_title=False)
     custom(d, "History tiles", history_tiles_query(), panels.HISTORY_TILES, w=28, h=9, x=20, show_title=False)
     d.row(9)
     q = (f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} "

@@ -211,8 +211,9 @@ def store_map(selected: str | None = None, town: str = "") -> str:
             .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", base).replace("@@LEGY@@", str(round(h - 32))).replace("@@LEGBOX@@", str(round(h - 46))).replace("@@BAD@@", str(BAD_CABINETS)))
 
 
-# Act 3: where did "admin" log in during the last 12 months? One bubble per store, sized by the number of admin logins; red when an address
-# that is neither a contractor nor a store LAN logged in. Rows: store, logins, outside, first_outside_txt, from_ip, x, y, town, r.
+# Act 3: which stores did an unknown address log in to as admin, and which of them has the warming attack hit? One dot per store:
+# red = hit (a setpoint raised by a non-contractor address), amber = visited but not hit yet (might be next), grey = no unknown login in the period.
+# Rows: store, status, outside, hit_cabs, lead_days, first_outside_txt, first_hit_txt, from_ip, x, y, town, from_lbl, to_lbl.
 HISTORY_MAP = BASE_CSS + """
 <style>
 .cc .map{max-width:540px;margin:0 auto;position:relative}
@@ -221,26 +222,25 @@ HISTORY_MAP = BASE_CSS + """
 .cc .bub{cursor:default}
 .cc .bub:hover circle{stroke-width:4}
 </style>
-<div class="cc"><div class="zbar"><span class="muted">Admin logins per store, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }}{% endif %}{% endfor %} (bubble: all admin logins, red share: from an outside address)</span></div><div class="map">
-<svg viewBox="@@VB@@" width="100%" role="img" aria-label="Admin logins per store">
+<div class="cc"><div class="zbar"><span class="muted">Where an unknown address logged in as admin, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }}{% endif %}{% endfor %}. Red: already hit. Amber: might be next.</span></div><div class="map">
+<svg viewBox="@@VB@@" width="100%" role="img" aria-label="Stores visited by an unknown address">
   @@BASE@@
   <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
   <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
   <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
   {% for row in rows %}
   <g class="bub">
-    {% assign circ = row["r"].value | times: 3.14159 %}{% assign dash = circ | times: row["outside"].value | divided_by: row["logins"].value %}
-    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | plus: 2 }}" fill="#fff"/>
-    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" fill="#6092C0"/>
-    {% if row["outside"].value > 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | divided_by: 2.0 }}" fill="none" stroke="#BD271E" stroke-width="{{ row["r"].value }}" stroke-dasharray="{{ dash }} {{ circ }}" transform="rotate(-90 {{ row["x"].value }} {{ row["y"].value }})"/>{% endif %}
-    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" fill="transparent">
-      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in this period: {{ row["logins"].value | minus: row["outside"].value }} from contractors and store LANs{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first in this period on {{ row["first_outside_txt"].value }}{% endif %}</title></circle>
-    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["logins"].value }}</text>
+    {% if row["status"].value == "visited" %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="19" fill="none" stroke="#F5A700" stroke-width="2.5" stroke-dasharray="4 3"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{% if row["status"].value == "clear" %}8{% else %}12{% endif %}" stroke="#fff" stroke-width="2.5"
+      fill="{% if row["status"].value == "hit" %}#BD271E{% elsif row["status"].value == "visited" %}#F5A700{% else %}#9AA7B8{% endif %}">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {% if row["status"].value == "hit" %}HIT. {{ row["hit_cabs"].value }} cabinets raised to +50 C. An unknown address logged in as admin {{ row["outside"].value }} time(s) from {{ row["from_ip"].value }}, first in this period on {{ row["first_outside_txt"].value }}{% if row["lead_days"].value > 0 %}, {{ row["lead_days"].value }} days before the first setpoint change on {{ row["first_hit_txt"].value }}{% endif %}.{% elsif row["status"].value == "visited" %}Might be next. An unknown address logged in as admin {{ row["outside"].value }} time(s) from {{ row["from_ip"].value }}, first on {{ row["first_outside_txt"].value }}. No setpoint change yet.{% else %}No admin login from an unknown address in this period ({{ row["logins"].value }} admin logins in total).{% endif %}</title></circle>
+    {% if row["status"].value != "clear" %}<text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>{% endif %}
   </g>
   {% endfor %}
-  <rect x="8" y="@@LEGBOX@@" width="420" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
-  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">contractor or store LAN</text>
-    <circle cx="204" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="218" y="@@LEGY@@" dy="4.5">outside address</text></g>
+  <rect x="8" y="@@LEGBOX@@" width="430" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">hit</text>
+    <circle cx="82" cy="@@LEGY@@" r="7" fill="#F5A700" stroke="#fff" stroke-width="1.5"/><text x="96" y="@@LEGY@@" dy="4.5">visited, not hit yet</text>
+    <circle cx="250" cy="@@LEGY@@" r="6" fill="#9AA7B8" stroke="#fff" stroke-width="1.5"/><text x="264" y="@@LEGY@@" dy="4.5">no unknown login</text></g>
   <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>
 </svg></div></div>
 """
@@ -252,27 +252,34 @@ def history_map() -> str:
             .replace("@@LEGBOX@@", str(round(h - 46))))
 
 
-# Act 3: four cards with a coloured stripe. Rows: label, value, note, state (green or red).
+# Act 3: four cards with a coloured stripe, from one row: visited, hit_stores, next_stores, outside_logins, all_logins, first_txt.
 HISTORY_TILES = BASE_CSS + """
 <style>
 .cc{container-type:inline-size}
 .cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
 .cc .et.red{border-left-color:#BD271E}
+.cc .et.amber{border-left-color:#F5A700}
 .cc .et .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
 .cc .et .big{font-size:clamp(24px,2.8cqw,40px);font-weight:700;line-height:1.1}
 .cc .et.red .big{color:#BD271E}
+.cc .et.amber .big{color:#B77A00}
 .cc .et .norm{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
 </style>
-<div class="cc"><div class="est">
 {% for row in rows %}
-<div class="et {{ row["state"].value }}">
-  <div class="lbl">{{ row["label"].value }}</div>
-  <div class="big">{{ row["value"].value }}</div>
-  <div class="norm">{{ row["note"].value }}</div>
-</div>
-{% endfor %}
+{% assign out = row["outside_logins"].value | default: 0 %}{% assign all = row["all_logins"].value | default: 0 %}
+{% assign vis = row["visited"].value | default: 0 %}{% assign hit = row["hit_stores"].value | default: 0 %}{% assign nxt = row["next_stores"].value | default: 0 %}
+<div class="cc"><div class="est">
+<div class="et{% if out > 0 %} red{% endif %}"><div class="lbl">Admin logins from unknown addresses</div><div class="big">{{ out }}</div>
+  <div class="norm">of {{ all }} admin logins in the period. Normal: 0</div></div>
+<div class="et{% if vis > 0 %} red{% endif %}"><div class="lbl">Stores an unknown address logged in to</div><div class="big">{{ vis }}</div>
+  <div class="norm">{% if vis > 0 %}first on {{ row["first_txt"].value }}. {% endif %}Normal: 0</div></div>
+<div class="et{% if hit > 0 %} red{% endif %}"><div class="lbl">Already hit by the warming attack</div><div class="big">{{ hit }}</div>
+  <div class="norm">a setpoint raised by a non-contractor address</div></div>
+<div class="et{% if nxt > 0 %} amber{% endif %}"><div class="lbl">Visited, not hit yet: might be next</div><div class="big">{{ nxt }}</div>
+  <div class="norm">an unknown address logged in, nothing changed</div></div>
 </div></div>
+{% endfor %}
 """
 
 
