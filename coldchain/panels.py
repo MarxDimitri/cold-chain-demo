@@ -46,6 +46,11 @@ def _lamp_svg(lit: bool) -> str:
   <rect x="330" y="0" width="340" height="150" fill="#FEC514" fill-opacity=".10"/>
   {beam}
   <rect x="496" y="46" width="8" height="104" rx="3" fill="#69707D"/>
+  <g fill="#FFF3C4" stroke="#8A6A00" stroke-width="2" stroke-linejoin="round">
+    <g transform="translate(446,100)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+    <g transform="translate(518,100)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+  </g>
+
   <path d="M496 52 Q496 26 536 24" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
   <rect x="518" y="14" width="44" height="16" rx="6" fill="#343741"/>
   <ellipse cx="540" cy="34" rx="15" ry="5" fill="#FFE9A8"/>
