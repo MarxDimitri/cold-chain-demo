@@ -238,6 +238,49 @@ POS_EVIDENCE = BASE_CSS + """
 
 # Act 1: the store from above, with the aggregates of every system rendered where that system sits in the store.
 # Query: one union of four kinds of rows (cabinet, audit, flows, asset, assets); see STORE_QUERY in dashboards.py.
+# Act 1: three state tiles beside the store layout. Query: one row kind "now" (setpoint, air) and one "changes".
+CABINET_TILES = BASE_CSS + """
+<style>
+.cc .tiles{display:flex;flex-direction:column;gap:12px;height:100%}
+.cc .tile{flex:1;min-height:170px;border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:12px 16px;
+  display:flex;flex-direction:column;justify-content:center}
+.cc .tile.bad{border-left-color:#BD271E}
+.cc .tile .lbl{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .tile .big{font-size:54px;font-weight:700;line-height:1.1;margin:4px 0}
+.cc .tile.bad .big{color:#BD271E}
+.cc .tile .unit{font-size:20px;font-weight:400;opacity:.7}
+.cc .tile .norm{font-size:13px;opacity:.85}
+.cc .tile .state{font-size:12px;font-weight:700;margin-top:4px;color:#00857c}
+.cc .tile.bad .state{color:#BD271E}
+</style>
+{% assign setpoint = 0 %}{% assign air = 0 %}{% assign changes = 0 %}{% assign have = false %}
+{% for row in rows %}
+  {% if row["kind"].value == "now" %}{% assign setpoint = row["setpoint"].value %}{% assign air = row["air"].value %}{% assign have = true %}
+  {% elsif row["kind"].value == "changes" %}{% assign changes = row["changes"].value %}{% endif %}
+{% endfor %}
+<div class="cc"><div class="tiles">
+  <div class="tile{% if setpoint > -18 %} bad{% endif %}">
+    <div class="lbl">Setpoint now</div>
+    <div class="big">{{ setpoint }}<span class="unit"> °C</span></div>
+    <div class="norm">Normal: -28 to -18 °C for a frozen cabinet (documented maximum: +50 °C)</div>
+    <div class="state">{% if setpoint > -18 %}outside the normal range{% else %}in range{% endif %}</div>
+  </div>
+  <div class="tile{% if air > -18 %} bad{% endif %}">
+    <div class="lbl">Air temperature now</div>
+    <div class="big">{{ air }}<span class="unit"> °C</span></div>
+    <div class="norm">Normal: within about 1 K of the setpoint; up to +14 K during a 40 minute defrost</div>
+    <div class="state">{% if air > -18 %}too warm for frozen food{% else %}in range{% endif %}</div>
+  </div>
+  <div class="tile{% if changes > 0 %} bad{% endif %}">
+    <div class="lbl">Parameter changes on this cabinet</div>
+    <div class="big">{{ changes }}</div>
+    <div class="norm">Normal: none on most days; a contractor change stays within the normal range</div>
+    <div class="state">{% if changes > 0 %}changed in this window{% else %}no changes{% endif %}</div>
+  </div>
+</div></div>
+"""
+
+
 STORE_LAYOUT = BASE_CSS + """
 {% assign changes = 0 %}{% assign logins = 0 %}{% assign events = 0 %}{% assign readings = 0 %}{% assign attacked = 0 %}
 {% assign f_sm = 0 %}{% assign f_srv = 0 %}{% assign f_lane = 0 %}{% assign f_bo = 0 %}{% assign f_total = 0 %}
