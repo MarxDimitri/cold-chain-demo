@@ -163,7 +163,7 @@ backfill-pos:
 baselines:
 	$(PY) -m coldchain.baselines
 
-# Act 0: measures every source in the cluster and loads the kb-sources catalog (seconds).
+# Act 0: loads the kb-sources catalog (labels, realms, lit or dark). The sizes on the dashboard are counted live.
 sources:
 	$(PY) -m coldchain.sources
 

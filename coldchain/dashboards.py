@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import requests
 
 from .elastic import client
-from . import panels
+from . import panels, sources
 from .envfile import load_env
 
 T = "@timestamp >= ?_tstart AND @timestamp < ?_tend"
@@ -197,8 +197,7 @@ def act0() -> Dash:
     d = Dash("coldchain-act0-sources", "Act 0: The streetlight effect - we search where the light is",
              "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
              time=("now-24h", "now"))
-    q = ("FROM kb-sources | SORT tier_order, rows DESC "
-         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, zone, label, what, rows_txt")
+    q = sources.live_query(THOUSANDS)
     custom(d, "The realms", q, panels.REALMS, w=48, h=50, show_title=False)
     d.row(50)
     return d
@@ -207,8 +206,7 @@ def act0() -> Dash:
 def act0_lit() -> Dash:
     d = Dash(panels.LIT_PAGE, "Act 0: The light is on - one platform, every realm",
              "The same sources with the light on: nothing in the dark. Synthetic data.", time=("now-24h", "now"))
-    q = ("FROM kb-sources | SORT tier_order, rows DESC "
-         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, zone, label, what, rows_txt")
+    q = sources.live_query(THOUSANDS)
     custom(d, "The realms, lit", q, panels.REALMS_LIT, w=48, h=50, show_title=False)
     d.row(50)
     return d

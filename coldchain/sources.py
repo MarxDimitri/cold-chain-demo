@@ -1,15 +1,14 @@
-"""The catalog of every source of truth in the demo, measured from the cluster, for the dashboard "Act 0".
+"""The catalog of every source of truth in the demo, for the dashboard "Act 0".
 
-    python -m coldchain.sources              # measure every source and load kb-sources (seconds)
+    python -m coldchain.sources              # load kb-sources (what each source is and which realm it belongs to)
 
-`kb-sources` has one row per source: its realm (Security, Observability or Knowledge base), what it holds, how many rows, how far back it reaches and the question it answers.
-The dashboard reads it with ES|QL.
+`kb-sources` has one row per source: its realm (Security, Observability or Knowledge base), the label, what it holds and whether the SOC already
+watches it ("lit") or not ("dark"). That is the editorial part. The sizes are not stored: the dashboard counts every index live with
+`live_query()`, one ES|QL query over all of them, and joins the result to `kb-sources`.
 """
 from __future__ import annotations
 
 import argparse
-import sys
-from datetime import datetime, timezone
 
 from elasticsearch import helpers
 
@@ -63,26 +62,25 @@ LABELS = {'logs-coldchain.case-default': 'Cabinet telemetry',
           'cc-hunt-findings': 'Hunt findings'}
 
 
-def catalog(es) -> list[dict]:
-    now = datetime.now(timezone.utc).isoformat()
-    rows = []
-    for src, tier, what, timed in SOURCES:
-        q = f"FROM {src} | STATS rows = COUNT(*)" + (", first_seen = MIN(@timestamp), last_seen = MAX(@timestamp)" if timed else "")
-        try:
-            vals = es.esql.query(query=q, format="json")["values"]
-            vals = vals[0] if vals else [0, None, None]
-        except Exception as e:  # a source that does not exist yet is listed as empty
-            print(f"  {src}: {str(e)[:100]}", file=sys.stderr)
-            vals = [0, None, None]
-        n = vals[0]
-        first, last = (vals[1], vals[2]) if timed else (None, None)
-        days = None
-        if first and last:
-            days = max(1, round((datetime.fromisoformat(last.replace("Z", "+00:00")) - datetime.fromisoformat(first.replace("Z", "+00:00"))).total_seconds() / 86400))
-        rows.append({"source": src, "label": LABELS[src], "zone": "lit" if src in LIT else "dark", "tier": tier, "tier_order": TIER_ORDER[tier], "what": what, "ask_with": f"FROM {src}",
-                     "rows": n, "first_seen": first, "last_seen": last, "days": days, "measured_at": now})
-        print(f"  {src:36} {n:>12,} rows", flush=True)
-    return rows
+def catalog() -> list[dict]:
+    """What each source is: no measurement, the counts are taken live by the dashboard."""
+    return [{"source": src, "label": LABELS[src], "zone": "lit" if src in LIT else "dark", "tier": tier, "tier_order": TIER_ORDER[tier],
+             "what": what} for src, tier, what, _ in SOURCES]
+
+
+def live_query(thousands: str) -> str:
+    """ES|QL for Act 0: count every source in the cluster right now (rows, first and last time) and join the editorial `kb-sources`.
+
+    `thousands` formats the count (ES|QL has no number formatting): a template with {col}.
+    """
+    subs = []
+    for src, _, _, timed in SOURCES:
+        if timed:
+            subs.append(f'(FROM {src} | STATS n = COUNT(*), first_at = MIN(@timestamp), last_at = MAX(@timestamp) | EVAL source = "{src}")')
+        else:
+            subs.append(f'(FROM {src} | STATS n = COUNT(*) | EVAL source = "{src}", first_at = TO_DATETIME(NULL), last_at = TO_DATETIME(NULL))')
+    return (f"FROM {', '.join(subs)} | LOOKUP JOIN kb-sources ON source | SORT tier_order, n DESC "
+            f"| EVAL rows_txt = {thousands.format(col='n')} | KEEP tier, zone, label, what, rows_txt")
 
 
 def load(es, rows: list[dict]) -> None:
@@ -91,9 +89,7 @@ def load(es, rows: list[dict]) -> None:
         es.indices.delete(index=index)
     keyword = {"type": "keyword"}
     es.indices.create(index=index, settings={"index.mode": "lookup"}, mappings={"properties": {
-        "measured_at": {"type": "date"}, "source": keyword, "label": keyword, "zone": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword,
-        "ask_with": keyword, "rows": {"type": "long"}, "first_seen": {"type": "date"}, "last_seen": {"type": "date"},
-        "days": {"type": "integer"}}})
+        "source": keyword, "label": keyword, "zone": keyword, "tier": keyword, "tier_order": {"type": "integer"}, "what": keyword}})
     helpers.bulk(es, ({"_index": index, "_source": r} for r in rows), refresh="wait_for")
     print(f"{index}: {len(rows)} rows")
 
@@ -101,7 +97,7 @@ def load(es, rows: list[dict]) -> None:
 def main(argv: list[str] | None = None) -> None:
     argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args(argv)
     es = client()
-    load(es, catalog(es))
+    load(es, catalog())
 
 
 if __name__ == "__main__":
