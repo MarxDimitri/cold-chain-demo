@@ -65,7 +65,7 @@ class Dash:
 
 # The acts in story order: dashboard id, label, a few words. The navigation strip links to the previous and the next one.
 ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch"),
-        ("coldchain-act1a-cabinet", "Act 1", "One cabinet"),
+        ("coldchain-act1a-cabinet", "Act 1", "Store 07 from above"),
         ("coldchain-act1b-estate", "Act 2", "The whole estate"),
         ("coldchain-act3-history", "Act 3", "The history nobody looked at"),
         ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
@@ -218,9 +218,9 @@ STORE_QUERY = """FROM (FROM metrics-coldchain.case-default
 def act1a() -> Dash:
     """What one contractor sees: a single cabinet, no estate, no alerts. Same indexed data as 1b, filtered to one device."""
     cab = f'device.id == "{CONTRACTOR_CABINET}"'
-    d = Dash("coldchain-act1a-cabinet", "Act 1: One cabinet, the contractor's view",
+    d = Dash("coldchain-act1a-cabinet", "Act 1: Store 07, Colmar, from above - what each system says",
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
-    custom(d, "Store 07, Colmar, from above: what each system says", STORE_QUERY, panels.STORE_LAYOUT, w=48, h=32)
+    custom(d, "Store 07 from above", STORE_QUERY, panels.STORE_LAYOUT, w=48, h=32, show_title=False)
     d.row(32)
     tile = lambda title, q, col, x: metric(d, title, q, col, w=16, x=x)
     tile("Setpoint now (°C)", f"FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() "

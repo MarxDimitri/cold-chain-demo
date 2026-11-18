@@ -18,7 +18,7 @@ version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is pres
 | Time | Dashboard (Kibana) | What the audience sees |
 |---|---|---|
 | 0:00 | **Act 0: The streetlight effect - we search where the light is** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
-| 1:30 | **Act 1: One cabinet, the contractor's view** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
+| 1:30 | **Act 1: Store 07, Colmar, from above - what each system says** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
 | 3:00 | **Act 2: The same blip across the whole estate, not on SOC's radar** | Twenty stores in one look: 46 setpoint changes in 3 stores, one of them from inside the store. |
 | 5:30 | **Act 3: The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
 | 8:00 | **Act 4: Hunting agent - the agent that keeps looking** | Nobody asked, and something is going on: findings with evidence, including a POS terminal talking to the refrigeration controller. |
