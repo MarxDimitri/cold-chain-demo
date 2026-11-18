@@ -90,6 +90,8 @@ def nav_panel(dash_id: str) -> dict | None:
     """A quiet strip: small previous and next links on the sides and one numbered dot per act in the middle."""
     ids = [a[0] for a in ACTS]
     dash_id = {panels.LIT_PAGE: panels.DARK_PAGE}.get(dash_id, dash_id)  # "the light is on" is Act 0 with the light on
+    if dash_id.startswith("coldchain-act1a-s07-"):  # a clicked cabinet is still Act 1
+        dash_id = "coldchain-act1a-cabinet"
     if dash_id not in ids:
         return None
     i = ids.index(dash_id)
@@ -242,18 +244,23 @@ STORE_QUERY = """FROM (FROM metrics-coldchain.case-default
 | LIMIT 100"""
 
 
-def act1a() -> Dash:
-    """What one contractor sees: a single cabinet, no estate, no alerts. Same indexed data as 1b, filtered to one device."""
-    cab = f'device.id == "{CONTRACTOR_CABINET}"'
-    d = Dash("coldchain-act1a-cabinet", "Act 1: Store 07, Colmar, from above - what each system says",
+def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
+    """What one contractor sees: a single cabinet, no estate, no alerts. Same indexed data as 1b, filtered to one device.
+
+    Every cabinet of store 07 has its own copy (clicked from the store layout); the contractor's cabinet is the Act 1 page.
+    """
+    cab = f'device.id == "{cabinet}"'
+    default = cabinet == CONTRACTOR_CABINET
+    d = Dash("coldchain-act1a-cabinet" if default else f"coldchain-act1a-{cabinet.lower()}",
+             "Act 1: Store 07, Colmar, from above - what each system says" + ("" if default else f" (cabinet {cabinet[-2:]})"),
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
-    custom(d, "Store 07 from above", STORE_QUERY, panels.STORE_LAYOUT, w=32, h=36, show_title=False)
+    custom(d, "Store 07 from above", STORE_QUERY, panels.store_layout(cabinet), w=32, h=36, show_title=False)
     tiles_q = (f"FROM (FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() | SORT @timestamp DESC | LIMIT 1 "
                "| EVAL kind = \"now\", setpoint = ROUND(coldchain.case.setpoint, 1), air = ROUND(coldchain.case.temperature.air, 1) "
                "| KEEP kind, setpoint, air), "
                f"(FROM logs-coldchain.audit-* | WHERE {cab} AND {T} AND event.action == \"parameter-change\" "
                "| STATS changes = COUNT(*) | EVAL kind = \"changes\" | KEEP kind, changes)")
-    custom(d, "State of the cabinet the contractor sees", tiles_q, panels.CABINET_TILES, w=16, h=36, x=32, show_title=False)
+    custom(d, "State of the cabinet the contractor sees", tiles_q, panels.cabinet_tiles(cabinet), w=16, h=36, x=32, show_title=False)
     d.row(36)
     q = (f"FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() "
          "| STATS air = ROUND(AVG(coldchain.case.temperature.air), 1), setpoint = ROUND(AVG(coldchain.case.setpoint), 1) "
@@ -263,7 +270,7 @@ def act1a() -> Dash:
            "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "air temperature °C", "visible": True}},
                     "y2": {"title": {"text": "setpoint °C", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add(f"{CONTRACTOR_CABINET}: air temperature and setpoint", cfg, 48, 12, query=q)
+    d.add(f"{cabinet}: air temperature and setpoint", cfg, 48, 12, query=q)
     d.row(12)
     table(d, "Changes on this cabinet",
           f'FROM logs-coldchain.audit-* | WHERE {cab} AND {T} AND event.action == "parameter-change" '
@@ -444,6 +451,11 @@ def hunt() -> Dash:
 # Ids are listed, not read from the builders.
 DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act0-lit": act0_lit, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
               "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos}
+# one Act 1 page per other cabinet of store 07, opened by clicking its number in the layout
+for _n in range(1, 25):
+    _cab = f"S07-C{_n:02d}"
+    if _cab != CONTRACTOR_CABINET:
+        DASHBOARDS[f"coldchain-act1a-{_cab.lower()}"] = (lambda c=_cab: act1a(c))
 
 
 # --- push / check ------------------------------------------------------------------------------------------------

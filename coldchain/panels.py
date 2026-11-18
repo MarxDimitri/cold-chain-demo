@@ -239,7 +239,7 @@ POS_EVIDENCE = BASE_CSS + """
 # Act 1: the store from above, with the aggregates of every system rendered where that system sits in the store.
 # Query: one union of four kinds of rows (cabinet, audit, flows, asset, assets); see STORE_QUERY in dashboards.py.
 # Act 1: three state tiles beside the store layout. Query: one row kind "now" (setpoint, air) and one "changes".
-CABINET_TILES = BASE_CSS + """
+_TILES_TPL = BASE_CSS + """
 <style>
 .cc .tiles{display:flex;flex-direction:column;gap:12px;height:100%}
 .cc .tile{flex:1;min-height:170px;border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:12px 16px;
@@ -259,20 +259,20 @@ CABINET_TILES = BASE_CSS + """
   {% elsif row["kind"].value == "changes" %}{% assign changes = row["changes"].value %}{% endif %}
 {% endfor %}
 <div class="cc"><div class="tiles">
-  <div class="tile{% if setpoint > -18 %} bad{% endif %}">
-    <div class="lbl">Setpoint now</div>
+  <div class="tile{% if setpoint > @@SP@@ %} bad{% endif %}">
+    <div class="lbl">Setpoint now · @@CAB@@</div>
     <div class="big">{{ setpoint }}<span class="unit"> °C</span></div>
-    <div class="norm">Normal: -28 to -18 °C for a frozen cabinet (documented maximum: +50 °C)</div>
-    <div class="state">{% if setpoint > -18 %}outside the normal range{% else %}in range{% endif %}</div>
+    <div class="norm">Normal: @@NORMAL@@ (documented maximum: +50 °C)</div>
+    <div class="state">{% if setpoint > @@SP@@ %}outside the normal range{% else %}in range{% endif %}</div>
   </div>
-  <div class="tile{% if air > -18 %} bad{% endif %}">
-    <div class="lbl">Air temperature now</div>
+  <div class="tile{% if air > @@AIR@@ %} bad{% endif %}">
+    <div class="lbl">Air temperature now · @@CAB@@</div>
     <div class="big">{{ air }}<span class="unit"> °C</span></div>
     <div class="norm">Normal: within about 1 K of the setpoint; up to +14 K during a 40 minute defrost</div>
-    <div class="state">{% if air > -18 %}too warm for frozen food{% else %}in range{% endif %}</div>
+    <div class="state">{% if air > @@AIR@@ %}too warm for @@KIND@@ food{% else %}in range{% endif %}</div>
   </div>
   <div class="tile{% if changes > 0 %} bad{% endif %}">
-    <div class="lbl">Parameter changes on this cabinet</div>
+    <div class="lbl">Parameter changes · @@CAB@@</div>
     <div class="big">{{ changes }}</div>
     <div class="norm">Normal: none on most days; a contractor change stays within the normal range</div>
     <div class="state">{% if changes > 0 %}changed in this window{% else %}no changes{% endif %}</div>
@@ -281,7 +281,18 @@ CABINET_TILES = BASE_CSS + """
 """
 
 
-STORE_LAYOUT = BASE_CSS + """
+def cabinet_tiles(cab: str = "S07-C05") -> str:
+    """The three state tiles for one cabinet. Cabinets 17 to 24 are chilled (0 to +5 °C), the rest frozen (-28 to -18 °C)."""
+    chilled = int(cab[-2:]) > 16
+    return (_TILES_TPL.replace("@@CAB@@", "C" + cab[-2:]).replace("@@SP@@", "5" if chilled else "-18")
+            .replace("@@AIR@@", "8" if chilled else "-18").replace("@@KIND@@", "chilled" if chilled else "frozen")
+            .replace("@@NORMAL@@", "0 to +5 °C for a chilled cabinet" if chilled else "-28 to -18 °C for a frozen cabinet"))
+
+
+CABINET_TILES = cabinet_tiles()
+
+
+_LAYOUT_TPL = BASE_CSS + """
 {% assign changes = 0 %}{% assign logins = 0 %}{% assign events = 0 %}{% assign readings = 0 %}{% assign attacked = 0 %}
 {% assign f_sm = 0 %}{% assign f_srv = 0 %}{% assign f_lane = 0 %}{% assign f_bo = 0 %}{% assign f_total = 0 %}
 {% assign mb_srv = 0 %}{% assign mb_lane = 0 %}{% assign mb_bo = 0 %}{% assign mb_total = 0 %}
@@ -315,13 +326,14 @@ STORE_LAYOUT = BASE_CSS + """
     {% if row["setpoint"].value > 5 %}{% assign fill = "#9C3B26" %}{% assign stroke = "#6e2414" %}{% assign ink = "#ffffff" %}
     {% elsif ci > 15 %}{% assign fill = "#E4EAF7" %}{% assign stroke = "#9FB3D8" %}{% assign ink = "#1a1c21" %}
     {% else %}{% assign fill = "#CDEFEA" %}{% assign stroke = "#00BFB3" %}{% assign ink = "#1a1c21" %}{% endif %}
-    <rect x="{{ x }}" y="{{ y }}" width="54" height="38" rx="6" fill="{{ fill }}" stroke="{% if row["cab"].value == "S07-C05" %}#1a1c21{% else %}{{ stroke }}{% endif %}" stroke-width="{% if row["cab"].value == "S07-C05" %}4{% else %}1.5{% endif %}">
+    <a href="/app/dashboards#/view/{% if row["cab"].value == "S07-C05" %}coldchain-act1a-cabinet{% else %}coldchain-act1a-{{ row["cab"].value | downcase }}{% endif %}" style="cursor:pointer">
+    <rect x="{{ x }}" y="{{ y }}" width="54" height="38" rx="6" fill="{{ fill }}" stroke="{% if row["cab"].value == "@@SEL@@" %}#1a1c21{% else %}{{ stroke }}{% endif %}" stroke-width="{% if row["cab"].value == "@@SEL@@" %}4{% else %}1.5{% endif %}">
       <title>{{ row["cab"].value }}: setpoint {{ row["setpoint"].value }} C, {{ row["readings"].value }} readings</title></rect>
-    <text x="{{ x | plus: 27 }}" y="{{ y | plus: 25 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text>
+    <text x="{{ x | plus: 27 }}" y="{{ y | plus: 25 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text></a>
     {% assign ci = ci | plus: 1 %}
   {% endif %}{% endfor %}
   <line x1="738" y1="95" x2="782" y2="95" stroke="#00BFB3" stroke-width="3" stroke-dasharray="7 5"/>
-  <text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">C05 (heavy outline): the one cabinet the contractor sees.</text>
+  @@CAPTION@@
   <text x="24" y="148" font-size="13" font-weight="700" fill="{% if attacked > 0 %}#BD271E{% else %}#00857c{% endif %}">{% if attacked > 0 %}{{ attacked }} cabinets at +50 °C{% else %}{{ readings }} readings in the window, all cabinets in band{% endif %}</text>
   {% if attacked > 0 %}
   <text x="440" y="148" font-size="11" font-weight="700" letter-spacing="1.5" fill="#BD271E">AT RISK</text>
@@ -390,3 +402,19 @@ STORE_LAYOUT = BASE_CSS + """
 </svg>
 </div>
 """
+
+
+def store_layout(cab: str = "S07-C05") -> str:
+    """The store from above with CAB outlined; every cabinet number links to that cabinet's own Act 1 dashboard."""
+    n = "C" + cab[-2:]
+    if cab == "S07-C05":
+        cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline): the one cabinet the contractor sees. '
+               'Click a cabinet number to look at it.</text>')
+    else:
+        cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline) selected. '
+               '<a href="/app/dashboards#/view/coldchain-act1a-cabinet"><tspan fill="#0B64DD" text-decoration="underline">Back to C05, '
+               'the contractor\'s cabinet</tspan></a></text>')
+    return _LAYOUT_TPL.replace("@@SEL@@", cab).replace("@@CAPTION@@", cap)
+
+
+STORE_LAYOUT = store_layout()
