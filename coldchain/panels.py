@@ -80,8 +80,12 @@ REALMS = BASE_CSS + """
 {% for row in rows %}{% if row["tier"].value == "Observability realm" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>
 <div class="cc-col"><div class="cc-cards">
-<div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Endpoints, firewalls, identity</b>
-  <div class="muted">The crown jewels. Your SIEM and EDR already cover them: not part of this demo.</div></div>
+<div class="card lit"><span class="zone">under the light</span><b>Endpoints</b>
+  <div class="muted">EDR telemetry per host: process starts, file and registry changes, logons, network connections. Usually the first source a SIEM ingests.</div></div>
+<div class="card lit"><span class="zone">under the light</span><b>Firewalls</b>
+  <div class="muted">Border firewall and VPN logs: allowed and denied connections, threat and URL events. Bulk allow logs often go to cheaper storage.</div></div>
+<div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Identity</b>
+  <div class="muted">Sign-ins and directory changes from Active Directory, Entra ID or Okta: MFA, privileged use, service accounts. Often the highest-value single source.</div></div>
 {% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}""" + CARD + """{% endif %}{% endfor %}
 {% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>

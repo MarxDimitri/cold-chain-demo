@@ -521,3 +521,7 @@ at 12:35 UTC was most likely the same bug. The Act 1 header is now the dashboard
   the three POS ML jobs remain (`edge-inbound-population`, `edge-pos-cpu`, `edge-pos-disk`).
 - **Not run in AWS (blocked, needs the operator):** `terraform apply` of the federation IAM user removal and emptying the old bucket
   objects. The new backfill overwrites the keys it needs; old objects without events are never indexed.
+
+## Act 0: the crown jewels as three tiles (2026-11-18)
+
+- The single "Endpoints, firewalls, identity" card is now three tiles under the light: **Endpoints** (EDR telemetry per host), **Firewalls** (border firewall and VPN logs) and **Identity** (sign-ins and directory changes). Their wording follows public guidance, not the demo's data (there is none for them): the ASD/ACSC "Priority logs for SIEM ingestion" ranks EDR first, then network devices, domain controllers and Active Directory logs, and for cloud identity the Microsoft unified audit and Entra sign-in logs; vendor guides call identity-provider authentication logs the highest-value single source, and note that bulk firewall allow logs often go to cheaper storage rather than the SIEM; Gartner's SOC visibility triad is endpoints (EDR), network (NDR) and logs (SIEM), with identity increasingly added. The point on stage: the covered realm is endpoints, firewalls and identity; flows, audit, TLS and the cold chain itself are in the dark.
