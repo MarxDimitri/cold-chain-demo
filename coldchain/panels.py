@@ -67,7 +67,9 @@ REALMS = BASE_CSS + """
 .cc-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .cc-sub{grid-column:1/-1;font-size:12px;font-weight:700;margin:6px 0 0 0;opacity:.85}
 .cc .card{position:relative}
-.cc .card.dark{background:rgba(52,55,65,.10);border-style:solid dashed solid solid}
+.cc .card.dark{background:#1b1d23;color:#e8eaf0;border-color:#3a3f4b}
+.cc .card.dark .muted{color:#c3c8d4;opacity:.85}
+.cc .card.dark .zone{color:#c3c8d4;opacity:.8}
 .cc .card.lit{background:rgba(240,78,152,.07)}
 .cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.65}
 .cc .card b{display:block;padding-right:70px}
