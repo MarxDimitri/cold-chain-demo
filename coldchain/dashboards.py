@@ -282,6 +282,43 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
     return d
 
 
+# (longitude, latitude, town) of each store, for the schematic map of Act 2 (towns from config/chain.yaml)
+STORE_GEO = {
+    "S01": (7.752, 48.573, "Strasbourg"),
+    "S02": (7.749, 48.608, "Schiltigheim"),
+    "S03": (7.336, 47.75, "Mulhouse"),
+    "S04": (7.789, 48.815, "Haguenau"),
+    "S05": (7.454, 48.26, "Selestat"),
+    "S06": (7.363, 48.742, "Saverne"),
+    "S07": (7.358, 48.079, "Colmar"),
+    "S08": (7.716, 48.53, "Illkirch"),
+    "S09": (7.105, 47.81, "Thann"),
+    "S10": (7.944, 49.037, "Wissembourg"),
+    "S11": (7.815, 48.573, "Kehl"),
+    "S12": (7.944, 48.473, "Offenburg"),
+    "S13": (7.842, 47.999, "Freiburg"),
+    "S14": (7.87, 48.34, "Lahr"),
+    "S15": (8.24, 48.76, "Baden-Baden"),
+    "S16": (8.204, 48.859, "Rastatt"),
+    "S17": (7.852, 48.121, "Emmendingen"),
+    "S18": (7.661, 47.615, "Loerrach"),
+    "S19": (8.404, 49.007, "Karlsruhe"),
+    "S20": (7.632, 47.808, "Muellheim"),
+}
+
+
+def store_map_query() -> str:
+    """One row per store for the map: how many cabinets are at +50 or warm without defrost, plus the map position of its town."""
+    xs = ", ".join(f'store == "{k}", {round((v[0] - 6.9) * 293, 1)}' for k, v in STORE_GEO.items())
+    ys = ", ".join(f'store == "{k}", {round((49.1 - v[1]) * 437.5, 1)}' for k, v in STORE_GEO.items())
+    towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
+    return (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
+            "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
+            "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
+            "AND coldchain.case.setpoint > 5 BY store = retail.store.id "
+            f'| EVAL x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "") | SORT store')
+
+
 def estate_tiles_query() -> str:
     """Four values, each looked up against its normal in kb-baselines; the stripe colour comes from the same thresholds as before."""
     from .baselines import THRESHOLDS as th
@@ -320,14 +357,10 @@ def estate_tiles_query() -> str:
 def act1() -> Dash:
     d = Dash("coldchain-act1b-estate", "Act 2: The same blip across the whole estate, not on SOC's radar",
              "Synthetic data, fictional chain: 20 stores, 480 cabinets. Central IT's view.")
-    custom(d, "Estate tiles", estate_tiles_query(), panels.ESTATE_TILES, w=48, h=6, show_title=False)
-    d.row(6)
-    q = (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
-         "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
-         "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
-         "AND coldchain.case.setpoint > 5 BY store = retail.store.id | SORT store")
-    custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
-    d.row(9)
+    # Left: the schematic map of the stores. Right: the four tiles, then the chart.
+    custom(d, "Twenty stores on the map", store_map_query(), panels.STORE_MAP, w=20, h=28, show_title=False)
+    custom(d, "Estate tiles", estate_tiles_query(), panels.ESTATE_TILES, w=28, h=8, x=20, show_title=False)
+    d.row(8)
     # One native chart (brush a time range to zoom, as in any Kibana chart): hottest and coolest store (median cabinet) as lines, the
     # setpoint changes as vertical bars on the right axis, raised (warming) red and lowered (cooling) blue, stacked.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
@@ -349,7 +382,7 @@ def act1() -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": "K above nominal (hottest and coolest store)", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 14, query=q)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 28, 20, x=20, query=q)
     # Logins and setpoint changes in one list, grouped per minute, store, user and source so that the 9 logins stay visible
     # next to the 46 changes and the 46 restores.
     tbl = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action IN ("logged-in", "parameter-change") '
@@ -359,8 +392,9 @@ def act1() -> Dash:
            "| STATS n = COUNT(*), t = MAX(@timestamp) BY m = BUCKET(@timestamp, 1 minute), store = retail.store.id, user = user.name, src, what "
            '| SORT t DESC | LIMIT 60 | EVAL time = DATE_FORMAT("MM-dd HH:mm:ss", t), what = CASE(n > 1, CONCAT(what, " x", TO_STRING(n)), what) '
            "| RENAME src AS source | KEEP time, store, user, source, what")
-    table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=20, h=14, x=28)
-    d.row(14)
+    d.row(20)
+    table(d, "Latest logins and setpoint changes", tbl, ["time", "store", "user", "source", "what"], w=48, h=11)
+    d.row(11)
     return d
 
 

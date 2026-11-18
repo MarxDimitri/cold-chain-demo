@@ -156,7 +156,7 @@ REALMS_LIT = realms(True)
 # Act 2: four estate tiles with a coloured stripe, like Act 1. Query rows: ord, label, value, normal, delta, state (green, amber, red).
 ESTATE_TILES = BASE_CSS + """
 <style>
-.cc .est{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:10px 16px}
 .cc .et.amber{border-left-color:#F5A700}
 .cc .et.red{border-left-color:#BD271E}
@@ -182,25 +182,37 @@ ESTATE_TILES = BASE_CSS + """
 """
 
 
-STORE_GRID = BASE_CSS + """
+# Act 2: a schematic map of the 20 stores (no tiles: custom panels load nothing external). Rows: store, attacked, warm, x, y, town.
+# x = (lon - 6.9) * 293 and y = (49.1 - lat) * 437.5 for the town of each store (config/chain.yaml); the Rhine is a rough line.
+STORE_MAP = BASE_CSS + """
 <style>
-.cc-stores{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
-.cc-store{border:1px solid rgba(128,128,128,.35);border-left:8px solid #54B399;border-radius:6px;padding:8px 6px;text-align:center}
-.cc-store b{display:block;font-size:16px}
-.cc-store span{font-size:11px;opacity:.85}
-.cc-bad{border-left-color:#BD271E}
-.cc-bad b,.cc-bad span{color:#BD271E;opacity:1}
-.cc-warn{border-left-color:#F5A700}
+.cc .map{max-width:560px;margin:0 auto}
+.cc .map svg{display:block}
+.cc .dot{cursor:default}
+.cc .dot:hover circle{stroke-width:4}
+@keyframes ccpulse{0%{r:12;opacity:.55}100%{r:30;opacity:0}}
+.cc .pulse{animation:ccpulse 1.8s ease-out infinite}
 </style>
-<div class="cc"><div class="cc-stores">
-{% for row in rows %}
-<div class="cc-store{% if row["attacked"].value > 0 %} cc-bad{% elsif row["warm"].value > 0 %} cc-warn{% endif %}">
-  <b>{{ row["store"].value }}</b>
-  <span>{% if row["attacked"].value > 0 %}{{ row["attacked"].value }} cabinets at +50 &deg;C{% else %}all cabinets normal{% endif %}</span>
-</div>
-{% endfor %}
-</div>
-<p class="muted">Stripe: green normal, red setpoints raised in the window, amber warm and not defrosting.</p></div>
+<div class="cc"><div class="map">
+<svg viewBox="0 0 500 700" width="100%" role="img" aria-label="The 20 stores on the Upper Rhine">
+  <path d="M202.2 673.7 L184.6 612.5 L196.3 546.9 L199.2 468.1 L222.7 393.7 L240.3 315.0 L263.7 253.7 L269.6 196.9 L301.8 140.0 L339.9 87.5 L375.0 52.5 L416.1 35.0" fill="none" stroke="#6092C0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/>
+  <text x="318" y="520" font-size="12" font-style="italic" fill="#6092C0" opacity=".9" transform="rotate(-78 318 520)">Rhine</text>
+  <text x="14" y="26" font-size="13" font-weight="700" fill="currentColor" opacity=".5" letter-spacing="2">FRANCE · ALSACE</text>
+  <text x="486" y="26" font-size="13" font-weight="700" fill="currentColor" opacity=".5" letter-spacing="2" text-anchor="end">GERMANY · BADEN</text>
+  {% for row in rows %}
+  <g class="dot">
+    {% if row["attacked"].value > 0 %}<circle class="pulse" cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" fill="#BD271E"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="12" stroke="#fff" stroke-width="2.5"
+      fill="{% if row["attacked"].value > 0 %}#BD271E{% elsif row["warm"].value > 0 %}#F5A700{% else %}#54B399{% endif %}">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {% if row["attacked"].value > 0 %}{{ row["attacked"].value }} cabinets at +50 C{% else %}all cabinets normal{% endif %}</title></circle>
+    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 4 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>
+  </g>
+  {% endfor %}
+  <g font-size="12" fill="currentColor"><circle cx="20" cy="652" r="7" fill="#54B399"/><text x="34" y="656">normal</text>
+    <circle cx="110" cy="652" r="7" fill="#BD271E"/><text x="124" y="656">setpoints raised</text>
+    <circle cx="260" cy="652" r="7" fill="#F5A700"/><text x="274" y="656">warm, no defrost</text>
+    <text x="20" y="686" opacity=".6" font-size="11">Schematic map, not to scale. Store numbers inside the dots; hover for the town.</text></g>
+</svg></div></div>
 """
 
 # Act 3: when the attacker's address first logged in to each store. Query: store, first_seen, days_ago, logins.
