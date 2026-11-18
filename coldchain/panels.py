@@ -20,52 +20,96 @@ BASE_CSS = """
 
 LIGHT, DARK, STRIPE_DARK = "#FEC514", "#14161b", "#69707D"  # yellow is the light, black is the dark
 
-LAMP_SVG = """
+LIT_PAGE = "coldchain-act0-lit"
+DARK_PAGE = "coldchain-act0-sources"
+
+
+def _lamp_svg(lit: bool) -> str:
+    """The streetlight over three realms. Dark: the beam lights the centre, the sides are black. Lit: the beam reaches everything."""
+    side_fill = '<rect x="0" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' \
+                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' if lit else \
+                '<rect x="0" y="0" width="330" height="150" rx="8" fill="#14161b"/>' \
+                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#14161b"/>'
+    beam = '<polygon points="488,42 512,42 1000,150 0,150" fill="url(#beam)"/>' if lit else \
+           '<polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>'
+    ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
+    cap = ("in the light", "everything in the light", "in the light") if lit else \
+          ("in the dark", "the crown jewels in the light, the rest in the dark", "in the dark")
+    return f"""
 <svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="330" height="150" rx="8" fill="#14161b"/>
-  <rect x="670" y="0" width="330" height="150" rx="8" fill="#14161b"/>
+  {side_fill}
   <rect x="330" y="0" width="340" height="150" fill="#FEC514" fill-opacity=".10"/>
-  <polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>
+  {beam}
   <rect x="496" y="46" width="8" height="104" rx="3" fill="#69707D"/>
   <path d="M496 52 Q496 26 536 24" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
   <rect x="518" y="14" width="44" height="16" rx="6" fill="#343741"/>
   <ellipse cx="540" cy="34" rx="15" ry="5" fill="#FFE9A8"/>
-  <g fill="#8C97A8" fill-opacity=".55"><rect x="34" y="86" width="38" height="52" rx="4"/><rect x="82" y="86" width="38" height="52" rx="4"/>
+  <g fill="{shape}" fill-opacity=".55"><rect x="34" y="86" width="38" height="52" rx="4"/><rect x="82" y="86" width="38" height="52" rx="4"/>
     <rect x="130" y="86" width="38" height="52" rx="4"/><rect x="178" y="86" width="38" height="52" rx="4"/><rect x="226" y="86" width="38" height="52" rx="4"/></g>
-  <text x="34" y="68" font-size="13" fill="#c3c8d4">cabinets, probes, POS terminals</text>
-  <g fill="#8C97A8" fill-opacity=".55"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
+  <text x="34" y="68" font-size="13" fill="{ink}">cabinets, probes, POS terminals</text>
+  <g fill="{shape}" fill-opacity=".55"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
     <rect x="720" y="130" width="130" height="14" rx="5"/></g>
-  <text x="720" y="68" font-size="13" fill="#c3c8d4">inventory, limits, profiles, manuals</text>
+  <text x="720" y="68" font-size="13" fill="{ink}">inventory, limits, profiles, manuals</text>
   <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
   <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">OBSERVABILITY REALM</text>
-  <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
+  <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[0]}</text>
   <text x="500" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">SECURITY REALM</text>
-  <text x="500" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">the crown jewels in the light, the rest in the dark</text>
+  <text x="500" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[1]}</text>
   <text x="835" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">KNOWLEDGE BASE REALM</text>
-  <text x="835" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
+  <text x="835" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[2]}</text>
 </svg>
 """
 
-# Act 0: the streetlight over three realms, and under each realm the sources it holds: yellow under the light, black in the dark.
-# Query: kb-sources (tier, zone, label, what, rows_txt).
-CARD = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}">
+
+def _switch(lit: bool) -> str:
+    """A light switch drawn as a toggle; it links to the other version of the page (links to dashboards work in custom panels)."""
+    target = DARK_PAGE if lit else LIT_PAGE
+    label = "Switch off the light" if lit else "Switch on the light"
+    track, knob_x = ("#FEC514", 32) if lit else ("#69707D", 12)
+    return (f'<div class="cc-switchbar"><a class="cc-switch" href="/app/dashboards#/view/{target}">'
+            f'<svg viewBox="0 0 44 24" width="44" height="24"><rect x="0" y="0" width="44" height="24" rx="12" fill="{track}"/>'
+            f'<circle cx="{knob_x}" cy="12" r="9" fill="#fff"/></svg><span>{label}</span></a></div>')
+
+
+_CARD_DARK = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}">
   <span class="zone">{% if row["zone"].value == "lit" %}under the light{% else %}in the dark{% endif %}</span>
   <b>{{ row["label"].value }}</b>
   <div class="num">{{ row["rows_txt"].value }}</div>
   <div class="muted">{{ row["what"].value }}</div>
 </div>"""
+_CARD_LIT = """<div class="card lit">
+  <span class="zone">in the light</span>
+  <b>{{ row["label"].value }}</b>
+  <div class="num">{{ row["rows_txt"].value }}</div>
+  <div class="muted">{{ row["what"].value }}</div>
+</div>"""
 
-REALMS = BASE_CSS + """
+_TILES = """<div class="card lit"><span class="zone">under the light</span><b>Endpoints</b>
+  <div class="muted">EDR telemetry per host: process starts, file and registry changes, logons, network connections. Usually the first source a SIEM ingests.</div></div>
+<div class="card lit"><span class="zone">under the light</span><b>Firewalls</b>
+  <div class="muted">Border firewall and VPN logs: allowed and denied connections, threat and URL events. Bulk allow logs often go to cheaper storage.</div></div>
+<div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Identity</b>
+  <div class="muted">Sign-ins and directory changes from Active Directory, Entra ID or Okta: MFA, privileged use, service accounts. Often the highest-value single source.</div></div>
+"""
+
+
+def realms(lit: bool) -> str:
+    """Act 0 template. Query: kb-sources (tier, zone, label, what, rows_txt). `lit` turns the light on for every source."""
+    card = _CARD_LIT if lit else _CARD_DARK
+    css = """
 <style>
+.cc-switchbar{display:flex;justify-content:flex-end;margin:0 8px 8px 0}
+.cc-switch{display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 6px;border:1px solid rgba(128,128,128,.45);border-radius:18px;
+  color:inherit;text-decoration:none;font-size:12px;opacity:.85}
+.cc-switch:hover{opacity:1;background:rgba(128,128,128,.15)}
 .cc-cols{display:grid;grid-template-columns:33fr 34fr 33fr;margin-top:12px}
 .cc-col{padding:0 8px}
 .cc-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.cc-sub{grid-column:1/-1;font-size:12px;font-weight:700;margin:6px 0 0 0;opacity:.85}
 .cc .card{position:relative}
 .cc .card b{display:block;padding-right:70px}
 .cc .card.lit{background:rgba(254,197,20,.16);border-left-color:#FEC514}
@@ -73,27 +117,19 @@ REALMS = BASE_CSS + """
 .cc .card.dark .muted{color:#c3c8d4;opacity:.85}
 .cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7}
 .cc .card.dark .zone{color:#c3c8d4}
-</style>
-<div class="cc">""" + LAMP_SVG + """
-<div class="cc-cols">
-<div class="cc-col"><div class="cc-cards">
-{% for row in rows %}{% if row["tier"].value == "Observability realm" %}""" + CARD + """{% endif %}{% endfor %}
-</div></div>
-<div class="cc-col"><div class="cc-cards">
-<div class="card lit"><span class="zone">under the light</span><b>Endpoints</b>
-  <div class="muted">EDR telemetry per host: process starts, file and registry changes, logons, network connections. Usually the first source a SIEM ingests.</div></div>
-<div class="card lit"><span class="zone">under the light</span><b>Firewalls</b>
-  <div class="muted">Border firewall and VPN logs: allowed and denied connections, threat and URL events. Bulk allow logs often go to cheaper storage.</div></div>
-<div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Identity</b>
-  <div class="muted">Sign-ins and directory changes from Active Directory, Entra ID or Okta: MFA, privileged use, service accounts. Often the highest-value single source.</div></div>
-{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}""" + CARD + """{% endif %}{% endfor %}
-{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}""" + CARD + """{% endif %}{% endfor %}
-</div></div>
-<div class="cc-col"><div class="cc-cards">
-{% for row in rows %}{% if row["tier"].value == "Knowledge base realm" %}""" + CARD + """{% endif %}{% endfor %}
-</div></div>
-</div></div>
-"""
+</style>"""
+    security = ('{% for row in rows %}{% if row["tier"].value == "Security realm" %}' + card + '{% endif %}{% endfor %}') if lit else \
+               ('{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}' + card + '{% endif %}{% endfor %}\n'
+                '{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}' + card + '{% endif %}{% endfor %}')
+    return (BASE_CSS + css + '<div class="cc">' + _switch(lit) + _lamp_svg(lit) + '\n<div class="cc-cols">\n'
+            '<div class="cc-col"><div class="cc-cards">\n{% for row in rows %}{% if row["tier"].value == "Observability realm" %}' + card +
+            '{% endif %}{% endfor %}\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + _TILES + security +
+            '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n{% for row in rows %}{% if row["tier"].value == "Knowledge base realm" %}' + card +
+            '{% endif %}{% endfor %}\n</div></div>\n</div></div>\n')
+
+
+REALMS = realms(False)
+REALMS_LIT = realms(True)
 
 # Act 2: one tile per store. Query: per store, the cabinets whose setpoint was raised, and the warm ones now.
 STORE_GRID = BASE_CSS + """

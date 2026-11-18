@@ -89,6 +89,7 @@ NAV_CSS = """<style>
 def nav_panel(dash_id: str) -> dict | None:
     """A quiet strip: small previous and next links on the sides and one numbered dot per act in the middle."""
     ids = [a[0] for a in ACTS]
+    dash_id = {panels.LIT_PAGE: panels.DARK_PAGE}.get(dash_id, dash_id)  # "the light is on" is Act 0 with the light on
     if dash_id not in ids:
         return None
     i = ids.index(dash_id)
@@ -195,6 +196,16 @@ def act0() -> Dash:
     q = ("FROM kb-sources | SORT tier_order, rows DESC "
          "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, zone, label, what, rows_txt")
     custom(d, "The realms", q, panels.REALMS, w=48, h=50, show_title=False)
+    d.row(50)
+    return d
+
+
+def act0_lit() -> Dash:
+    d = Dash(panels.LIT_PAGE, "Act 0: The light is on - one platform, every realm",
+             "The same sources with the light on: nothing in the dark. Synthetic data.", time=("now-24h", "now"))
+    q = ("FROM kb-sources | SORT tier_order, rows DESC "
+         "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, zone, label, what, rows_txt")
+    custom(d, "The realms, lit", q, panels.REALMS_LIT, w=48, h=50, show_title=False)
     d.row(50)
     return d
 
@@ -433,7 +444,7 @@ def hunt() -> Dash:
 
 
 # Ids are listed, not read from the builders.
-DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
+DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act0-lit": act0_lit, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
               "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos}
 
 
