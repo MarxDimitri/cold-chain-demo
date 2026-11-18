@@ -326,7 +326,7 @@ def act1() -> Dash:
     custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
     d.row(9)
     # One chart: hottest and coolest store (median cabinet) as lines, the setpoint changes as vertical lines on top of them.
-    x = 'ROUND(60 + DATE_DIFF("minutes", ?_tstart, t) * 920.0 / DATE_DIFF("minutes", ?_tstart, ?_tend), 1)'
+    x = 'ROUND(90 + DATE_DIFF("minutes", ?_tstart, t) * 1690.0 / DATE_DIFF("minutes", ?_tstart, ?_tend), 1)'
     pts = (f"(FROM metrics-coldchain.case-* | WHERE {T} AND @timestamp <= NOW() "
            f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL} "
            "| STATS typical = MEDIAN(warm) BY t = BUCKET(@timestamp, 5 minutes), retail.store.id "
@@ -334,8 +334,8 @@ def act1() -> Dash:
            "| INLINE STATS hi = MAX(hottest), lo = MIN(coolest) "
            "| EVAL top = CEIL(hi + 0.5), bot = FLOOR(LEAST(lo, 0.0) - 0.5), kind = \"pt\", "
            f"x = {x}, "
-           "yh = ROUND(20 + (top - hottest) * 280.0 / (top - bot), 1), yc = ROUND(20 + (top - coolest) * 280.0 / (top - bot), 1), "
-           'y0 = ROUND(20 + top * 280.0 / (top - bot), 1), when = DATE_FORMAT("MM-dd HH:mm", t) '
+           "yh = ROUND(60 + (top - hottest) * 340.0 / (top - bot), 1), yc = ROUND(60 + (top - coolest) * 340.0 / (top - bot), 1), "
+           'y0 = ROUND(60 + top * 340.0 / (top - bot), 1), when = DATE_FORMAT("MM-dd HH:mm", t) '
            "| KEEP kind, t, x, yh, yc, y0, top, bot, hottest, coolest, when)")
     evs = (f'(FROM logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() AND event.action == "parameter-change" '
            'AND coldchain.parameter.code == "setpoint" '
@@ -348,8 +348,8 @@ def act1() -> Dash:
            f'| EVAL kind = "ev", x = {x}, when = DATE_FORMAT("MM-dd HH:mm", t) | KEEP kind, t, x, dir, total, detail, when)')
     q = (f"FROM {pts}, {evs} "
          '| EVAL from_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("MM-dd HH:mm", ?_tend) | SORT kind, t')
-    custom(d, "The estate warms as the setpoints change", q, panels.ESTATE_CHART, w=48, h=15, show_title=False)
-    d.row(15)
+    custom(d, "The estate warms as the setpoints change", q, panels.ESTATE_CHART, w=48, h=20, show_title=False)
+    d.row(20)
     table(d, "Latest parameter changes",
           f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
           "| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT(\"MM-dd HH:mm\", @timestamp) "

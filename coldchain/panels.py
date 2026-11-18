@@ -182,48 +182,60 @@ ESTATE_TILES = BASE_CSS + """
 """
 
 
-# Act 2: one chart, drawn as SVG: hottest and coolest store as lines, setpoint changes as vertical lines (red raised, blue lowered) with
-# a count badge and a hover text naming stores, cabinets, user and source. Rows: kind pt (x, yh, yc, y0, top, bot, hottest, coolest, when)
-# and kind ev (x, dir, total, detail, when), plus from_lbl and to_lbl.
+# Act 2: one chart, drawn as SVG (viewBox 1800 x 500, plot x 90..1780, y 60..400): hottest and coolest store as lines (broken where there is
+# no data), setpoint changes as vertical lines (red raised, blue lowered) with a count badge. An HTML overlay over every change shows a hover
+# card naming the stores, cabinets, user and source. Rows: kind pt (x, yh, yc, y0, top, bot) and kind ev (x, dir, total, detail, when), from_lbl, to_lbl.
 ESTATE_CHART = BASE_CSS + """
 <style>
-.cc .ev{cursor:help}
-.cc .ev:hover .evl{stroke-width:4}
-.cc .pt{fill:transparent}
+.cc .ch{position:relative;line-height:0}
+.cc .ch svg{display:block}
+.cc .hv{position:absolute;top:0;height:82%;width:16px;margin-left:-8px;line-height:1.35}
+.cc .hv .tip{display:none;position:absolute;top:14%;left:14px;width:420px;padding:10px 12px;border-radius:8px;z-index:20;
+  background:#1d1e24;color:#f2f4f8;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.35);text-align:left}
+.cc .hv.left .tip{left:auto;right:14px}
+.cc .hv:hover .tip{display:block}
+.cc .hv:hover{background:rgba(128,128,128,.18)}
+.cc .tip b{display:block;margin-bottom:4px;font-size:13px}
+.cc .tip .up{color:#FF8A80}.cc .tip .down{color:#9DC3E6}
+.cc .tip div{margin:2px 0}
 </style>
-{% assign hot = "" %}{% assign cool = "" %}{% assign y0 = 0 %}{% assign top = 0 %}{% assign bot = 0 %}{% assign fl = "" %}{% assign tl = "" %}
+{% assign hot = "" %}{% assign cool = "" %}{% assign px = -100 %}{% assign y0 = 0 %}{% assign top = 0 %}{% assign bot = 0 %}{% assign fl = "" %}{% assign tl = "" %}
 {% for row in rows %}{% if row["kind"].value == "pt" %}
+  {% assign gap = row["x"].value | minus: px %}
+  {% if gap > 20 %}{% assign hot = hot | append: "|" %}{% assign cool = cool | append: "|" %}{% endif %}
   {% assign hot = hot | append: row["x"].value | append: "," | append: row["yh"].value | append: " " %}
   {% assign cool = cool | append: row["x"].value | append: "," | append: row["yc"].value | append: " " %}
-  {% assign y0 = row["y0"].value %}{% assign top = row["top"].value %}{% assign bot = row["bot"].value %}
+  {% assign px = row["x"].value %}{% assign y0 = row["y0"].value %}{% assign top = row["top"].value %}{% assign bot = row["bot"].value %}
 {% endif %}{% assign fl = row["from_lbl"].value %}{% assign tl = row["to_lbl"].value %}{% endfor %}
-<div class="cc"><svg viewBox="0 0 1000 360" width="100%" role="img" aria-label="Hottest and coolest store with the setpoint changes">
-  <g stroke="currentColor" opacity=".18"><line x1="60" y1="20" x2="980" y2="20"/><line x1="60" y1="160" x2="980" y2="160"/><line x1="60" y1="300" x2="980" y2="300"/>
-    <line x1="290" y1="20" x2="290" y2="300"/><line x1="520" y1="20" x2="520" y2="300"/><line x1="750" y1="20" x2="750" y2="300"/></g>
-  <line x1="60" y1="{{ y0 }}" x2="980" y2="{{ y0 }}" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" opacity=".55"/>
-  <g font-size="12" fill="currentColor" opacity=".8" text-anchor="end"><text x="54" y="24">{{ top }}</text><text x="54" y="{{ y0 | plus: 4 }}">0</text><text x="54" y="304">{{ bot }}</text></g>
-  <text transform="translate(14,160) rotate(-90)" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">K above nominal</text>
-  <g font-size="12" fill="currentColor" opacity=".8"><text x="60" y="322">{{ fl }}</text><text x="980" y="322" text-anchor="end">{{ tl }}</text></g>
-  <polyline points="{{ cool }}" fill="none" stroke="#00BFB3" stroke-width="2.4" stroke-linejoin="round"/>
-  <polyline points="{{ hot }}" fill="none" stroke="#E7664C" stroke-width="2.4" stroke-linejoin="round"/>
-  {% for row in rows %}{% if row["kind"].value == "pt" %}
-  <rect class="pt" x="{{ row["x"].value | minus: 1.6 }}" y="20" width="3.2" height="280"><title>{{ row["when"].value }} UTC: hottest store {{ row["hottest"].value }} K, coolest store {{ row["coolest"].value }} K above nominal (median cabinet)</title></rect>
-  {% endif %}{% endfor %}
+{% assign hot_segs = hot | split: "|" %}{% assign cool_segs = cool | split: "|" %}
+<div class="cc"><div class="ch">
+<svg viewBox="0 0 1800 500" width="100%" role="img" aria-label="Hottest and coolest store with the setpoint changes">
+  <g stroke="currentColor" opacity=".18"><line x1="90" y1="60" x2="1780" y2="60"/><line x1="90" y1="230" x2="1780" y2="230"/><line x1="90" y1="400" x2="1780" y2="400"/>
+    <line x1="513" y1="60" x2="513" y2="400"/><line x1="935" y1="60" x2="935" y2="400"/><line x1="1358" y1="60" x2="1358" y2="400"/></g>
+  <line x1="90" y1="{{ y0 }}" x2="1780" y2="{{ y0 }}" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 5" opacity=".55"/>
+  <g font-size="14" fill="currentColor" opacity=".8" text-anchor="end"><text x="80" y="65">{{ top }}</text><text x="80" y="{{ y0 | plus: 5 }}">0</text><text x="80" y="405">{{ bot }}</text></g>
+  <text transform="translate(22,230) rotate(-90)" text-anchor="middle" font-size="14" fill="currentColor" opacity=".8">K above nominal</text>
+  <g font-size="14" fill="currentColor" opacity=".8"><text x="90" y="428">{{ fl }}</text><text x="1780" y="428" text-anchor="end">{{ tl }}</text></g>
+  {% for seg in cool_segs %}<polyline points="{{ seg }}" fill="none" stroke="#00BFB3" stroke-width="2.6" stroke-linejoin="round"/>{% endfor %}
+  {% for seg in hot_segs %}<polyline points="{{ seg }}" fill="none" stroke="#E7664C" stroke-width="2.6" stroke-linejoin="round"/>{% endfor %}
   {% for row in rows %}{% if row["kind"].value == "ev" %}
-  <g class="ev">
-    <line class="evl" x1="{{ row["x"].value }}" y1="20" x2="{{ row["x"].value }}" y2="300" stroke="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}" stroke-width="2.4"/>
-    <rect x="{{ row["x"].value | minus: 13 }}" y="2" width="26" height="16" rx="8" fill="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}"/>
-    <text x="{{ row["x"].value }}" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{{ row["total"].value }}</text>
-    <rect x="{{ row["x"].value | minus: 7 }}" y="2" width="14" height="298" fill="transparent"/>
-    <title>{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}. {{ row["detail"].value }}</title>
-  </g>
+  <line x1="{{ row["x"].value }}" y1="{% if row["dir"].value == "up" %}30{% else %}52{% endif %}" x2="{{ row["x"].value }}" y2="400" stroke="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}" stroke-width="2.6"/>
+  <rect x="{{ row["x"].value | minus: 17 }}" y="{% if row["dir"].value == "up" %}8{% else %}30{% endif %}" width="34" height="22" rx="11" fill="{% if row["dir"].value == "up" %}#BD271E{% else %}#6092C0{% endif %}"/>
+  <text x="{{ row["x"].value }}" y="{% if row["dir"].value == "up" %}24{% else %}46{% endif %}" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">{{ row["total"].value }}</text>
   {% endif %}{% endfor %}
-  <g font-size="12" fill="currentColor"><line x1="60" y1="344" x2="84" y2="344" stroke="#E7664C" stroke-width="2.4"/><text x="90" y="348">hottest store</text>
-    <line x1="190" y1="344" x2="214" y2="344" stroke="#00BFB3" stroke-width="2.4"/><text x="220" y="348">coolest store</text>
-    <line x1="330" y1="336" x2="330" y2="352" stroke="#BD271E" stroke-width="3"/><text x="338" y="348">setpoint raised (warming)</text>
-    <line x1="520" y1="336" x2="520" y2="352" stroke="#6092C0" stroke-width="3"/><text x="528" y="348">setpoint lowered (cooling)</text>
-    <text x="720" y="348" opacity=".7">hover a red or blue line for stores and cabinets</text></g>
-</svg></div>
+  <g font-size="15" fill="currentColor"><line x1="90" y1="474" x2="124" y2="474" stroke="#E7664C" stroke-width="3"/><text x="132" y="479">hottest store</text>
+    <line x1="270" y1="474" x2="304" y2="474" stroke="#00BFB3" stroke-width="3"/><text x="312" y="479">coolest store</text>
+    <line x1="470" y1="462" x2="470" y2="486" stroke="#BD271E" stroke-width="4"/><text x="482" y="479">setpoint raised (warming)</text>
+    <line x1="720" y1="462" x2="720" y2="486" stroke="#6092C0" stroke-width="4"/><text x="732" y="479">setpoint lowered (cooling)</text>
+    <text x="1000" y="479" opacity=".7">hover a red or blue line for the stores and cabinets</text></g>
+</svg>
+{% for row in rows %}{% if row["kind"].value == "ev" %}
+<div class="hv{% if row["x"].value > 1000 %} left{% endif %}" style="left:{{ row["x"].value | divided_by: 18.0 }}%">
+  <div class="tip"><b class="{{ row["dir"].value }}">{{ row["when"].value }} UTC: {{ row["total"].value }} setpoint changes, {% if row["dir"].value == "up" %}raised (warming){% else %}lowered (cooling){% endif %}</b>
+    {% assign parts = row["detail"].value | split: " | " %}{% for part in parts %}<div>{{ part }}</div>{% endfor %}</div>
+</div>
+{% endif %}{% endfor %}
+</div></div>
 """
 
 STORE_GRID = BASE_CSS + """
