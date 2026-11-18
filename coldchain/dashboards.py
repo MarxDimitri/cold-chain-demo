@@ -325,6 +325,17 @@ def act1() -> Dash:
          "AND coldchain.case.setpoint > 5 BY store = retail.store.id | SORT store")
     custom(d, "Twenty stores, one look", q, panels.STORE_GRID, w=48, h=9)
     d.row(9)
+    # Setpoint changes as plain bars per store (no time axis): raised setpoints warm the cabinet (red), lowered ones cool it (blue).
+    q = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" AND coldchain.parameter.code == "setpoint" '
+         "| STATS warming = COUNT(*) WHERE coldchain.parameter.value.new > coldchain.parameter.value.old, "
+         "cooling = COUNT(*) WHERE coldchain.parameter.value.new < coldchain.parameter.value.old BY store = retail.store.id | SORT store")
+    cfg = {"type": "xy", "layers": [{"type": "bar_horizontal", "data_source": esql(q), "x": {"column": "store"},
+                                     "y": [{"column": "warming", "color": {"type": "static", "color": RED}},
+                                           {"column": "cooling", "color": {"type": "static", "color": "#6092C0"}}]}],
+           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "setpoint changes", "visible": True}}},
+           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
+    d.add("Setpoint changes per store: warming (raised, red) and cooling (lowered, blue)", cfg, 48, 12, query=q)
+    d.row(12)
     # One query over telemetry and audit: every 5-minute slot has a value, so the red line sits at 0 between changes.
     q = (f"FROM metrics-coldchain.case-*, logs-coldchain.audit-* | WHERE {T} AND @timestamp <= NOW() "
          f"| EVAL warm = coldchain.case.temperature.air - {NOMINAL} "
