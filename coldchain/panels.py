@@ -21,7 +21,7 @@ BASE_CSS = """
 SEC, OBS, KBC = "#F04E98", "#00BFB3", "#FEC514"  # realm colours: Security, Observability, Knowledge base
 
 LAMP_SVG = """
-<svg viewBox="0 0 1000 200" width="100%" role="img" aria-label="A streetlight over three realms">
+<svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#F04E98" stop-opacity=".85"/><stop offset="1" stop-color="#F04E98" stop-opacity=".12"/>
@@ -42,10 +42,12 @@ LAMP_SVG = """
     <rect x="720" y="130" width="130" height="14" rx="5"/></g>
   <text x="720" y="68" font-size="13" fill="currentColor" opacity=".8">inventory, limits, profiles, manuals</text>
   <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
-  <text x="165" y="178" text-anchor="middle" font-size="14" font-weight="700" fill="#00857c">OBSERVABILITY REALM: in the dark</text>
-  <text x="500" y="178" text-anchor="middle" font-size="14" font-weight="700" fill="#C2327A">SECURITY REALM: crown jewels in the light, the rest in the dark</text>
-  <text x="835" y="178" text-anchor="middle" font-size="14" font-weight="700" fill="#946b00">KNOWLEDGE BASE REALM: in the dark</text>
-  <text x="500" y="196" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">what you usually watch: endpoints, firewalls, identity</text>
+  <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#00857c">OBSERVABILITY REALM</text>
+  <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
+  <text x="500" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#C2327A">SECURITY REALM</text>
+  <text x="500" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">the crown jewels in the light, the rest in the dark</text>
+  <text x="835" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#946b00">KNOWLEDGE BASE REALM</text>
+  <text x="835" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">in the dark</text>
 </svg>
 """
 
