@@ -26,12 +26,12 @@ DARK_PAGE = "coldchain-act0-sources"
 
 def _lamp_svg(lit: bool) -> str:
     """The streetlight over three realms. Dark: the beam lights the centre, the sides are black. Lit: the beam reaches everything."""
-    side_fill = '<rect x="0" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' \
-                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' if lit else \
-                '<rect x="0" y="0" width="330" height="150" rx="8" fill="#2c2f38"/>' \
-                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#2c2f38"/>'
-    beam = '<polygon points="488,42 512,42 1000,150 0,150" fill="url(#beam)"/>' if lit else \
-           '<polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>'
+    side_fill = '<rect x="0" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>' \
+                '<rect x="670" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>' if lit else \
+                '<rect x="0" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>' \
+                '<rect x="670" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>'
+    beam = '<polygon points="488,82 512,82 1000,190 0,190" fill="url(#beam)"/>' if lit else \
+           '<polygon points="488,82 512,82 664,190 336,190" fill="url(#beam)"/>'
     ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
     cap = ("in the light", "everything in the light", "in the light") if lit else \
           ("in the dark", "crown jewels in the light", "in the dark")
@@ -45,35 +45,35 @@ def _lamp_svg(lit: bool) -> str:
                 f'<text x="{tx}" y="41" text-anchor="{anchor}" font-size="11" fill="{u}">{sub}</text>')
 
     labels = (label(165, "OBSERVABILITY REALM", cap[0], lit) + label(835, "KNOWLEDGE BASE REALM", cap[2], lit)
-              + label(340, "SECURITY REALM", cap[1], True, "start"))
+              + label(500, "SECURITY REALM", cap[1], True))
     return f"""
-<svg viewBox="0 0 1000 156" width="100%" role="img" aria-label="A streetlight over three realms">
+<svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
     </linearGradient>
   </defs>
   {side_fill}
-  <rect x="330" y="0" width="340" height="150" fill="#FEC514" fill-opacity=".10"/>
+  <rect x="330" y="0" width="340" height="190" fill="#FEC514" fill-opacity=".10"/>
   {beam}
-  <rect x="496" y="46" width="8" height="104" rx="3" fill="#69707D"/>
+  <rect x="496" y="86" width="8" height="104" rx="3" fill="#69707D"/>
   <g fill="#FFF3C4" stroke="#8A6A00" stroke-width="2" stroke-linejoin="round">
-    <g transform="translate(446,100)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
-    <g transform="translate(518,100)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+    <g transform="translate(446,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+    <g transform="translate(518,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
   </g>
 
-  <path d="M496 52 Q496 26 536 24" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <rect x="518" y="14" width="44" height="16" rx="6" fill="#343741"/>
-  <ellipse cx="540" cy="34" rx="15" ry="5" fill="#FFE9A8"/>
-  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+  <path d="M496 92 Q496 66 536 64" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <rect x="518" y="54" width="44" height="16" rx="6" fill="#343741"/>
+  <ellipse cx="540" cy="74" rx="15" ry="5" fill="#FFE9A8"/>
+  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
     <g transform="translate(30,80)"><rect x="2" y="8" width="42" height="40" rx="3"/><line x1="2" y1="22" x2="44" y2="22"/><line x1="2" y1="35" x2="44" y2="35"/><path d="M23 0v6M19 3l4 3 4-3"/></g>
     <g transform="translate(88,80)"><rect x="2" y="4" width="38" height="26" rx="3"/><path d="M21 30v8M10 46h22M14 38h14v8"/><line x1="8" y1="12" x2="34" y2="12"/><line x1="8" y1="19" x2="24" y2="19"/></g>
     <g transform="translate(142,78)"><rect x="6" y="2" width="30" height="52" rx="4"/><line x1="6" y1="22" x2="36" y2="22"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="12" y1="28" x2="12" y2="38"/></g>
     <g transform="translate(196,78)"><rect x="16" y="2" width="10" height="34" rx="5"/><circle cx="21" cy="44" r="9"/><line x1="21" y1="12" x2="21" y2="44"/></g>
     <g transform="translate(244,82)"><rect x="2" y="4" width="46" height="38" rx="3"/><circle cx="12" cy="14" r="2.5"/><circle cx="22" cy="14" r="2.5"/><circle cx="32" cy="14" r="2.5"/><rect x="9" y="24" width="32" height="10" rx="2"/><path d="M10 42v6M20 42v6M30 42v6M40 42v6"/></g>
   </g>
-  <text x="34" y="144" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
-  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+  <text x="34" y="184" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
+  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
     <g transform="translate(700,82)"><path d="M3 14l18-9 18 9v22l-18 9-18-9z"/><path d="M3 14l18 9 18-9M21 23v22"/></g>
     <g transform="translate(748,82)"><path d="M4 38a20 20 0 1 1 34 0"/><line x1="21" y1="36" x2="30" y2="18"/><circle cx="21" cy="36" r="2.5"/><line x1="4" y1="44" x2="38" y2="44"/></g>
     <g transform="translate(796,82)"><rect x="2" y="6" width="40" height="34" rx="4"/><circle cx="14" cy="19" r="5"/><path d="M6 33c1-6 11-6 16 0M28 17h10M28 25h10"/></g>
@@ -81,7 +81,7 @@ def _lamp_svg(lit: bool) -> str:
     <g transform="translate(896,82)"><rect x="2" y="10" width="40" height="28" rx="4"/><line x1="2" y1="28" x2="42" y2="28"/><circle cx="34" cy="33" r="1.8"/><line x1="9" y1="33" x2="20" y2="33"/></g>
     <g transform="translate(944,80)"><ellipse cx="22" cy="10" rx="16" ry="6"/><path d="M6 10v28c0 3 7 6 16 6s16-3 16-6V10M6 24c0 3 7 6 16 6s16-3 16-6"/></g>
   </g>
-  <text x="720" y="144" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
+  <text x="720" y="184" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
 {labels}
 </svg>
 """
