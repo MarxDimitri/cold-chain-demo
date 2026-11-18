@@ -288,6 +288,15 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
 from .geo import STORE_GEO  # noqa: E402  (towns of the stores, shared with the truck generator)
 
 
+def geo_cases() -> str:
+    """ES|QL EVAL fragment: map position (x, y in the base map's units) and town of the store in column `store`."""
+    from . import mapdata
+    xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S, 1)}' for k, v in STORE_GEO.items())
+    ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S, 1)}' for k, v in STORE_GEO.items())
+    towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
+    return f'x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "")'
+
+
 def store_map_query() -> str:
     """Rows for the map: one per store (cabinets at +50, warm, bad frozen cabinets right now, position) and one per truck (position,
     cargo, next stop from the ERP plan, minutes to the planned arrival)."""
@@ -401,35 +410,54 @@ def act1(store: str | None = None) -> Dash:
 
 # --- Act 3: the history nobody looked at ---------------------------------------------------------------------------------
 
-OUTSIDE_LOGINS = ('WHERE event.action == "logged-in" AND NOT CIDR_MATCH(source.ip, "198.51.100.0/24") '
-                  'AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")')
-YEAR = {"from": "now-1y", "to": "now"}
+ADMIN = 'event.action == "logged-in" AND user.name == "admin"'
+OUTSIDE = 'NOT CIDR_MATCH(source.ip, "198.51.100.0/24") AND NOT CIDR_MATCH(source.ip, "10.0.0.0/8")'
+
+
+def history_map_query() -> str:
+    """Per store: admin logins in the period, how many came from an outside address, from where, and the first time."""
+    return (f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} "
+            f"| EVAL is_out = {OUTSIDE}, ip = TO_STRING(source.ip) "
+            "| STATS logins = COUNT(*), outside = COUNT(*) WHERE is_out, first_outside = MIN(@timestamp) WHERE is_out, "
+            "ips = VALUES(ip) WHERE is_out BY store = retail.store.id "
+            "| INLINE STATS most = MAX(logins) "
+            '| EVAL r = ROUND(9 + 13 * SQRT(logins / TO_DOUBLE(most)), 1), first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), from_ip = MV_CONCAT(ips, ", "), '
+            f"{geo_cases()} | SORT store")
+
+
+def history_tiles_query() -> str:
+    parts = [
+        (1, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} | STATS value = COUNT(*) "
+            '| EVAL label = "Admin logins", note = "all stores, in the period", state = "green"'),
+        (2, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT(*) "
+            '| EVAL label = "Logins from outside addresses", note = "Normal: 0 (contractors and store LANs only)", '
+            'state = CASE(value > 0, "red", "green")'),
+        (3, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT_DISTINCT(retail.store.id) "
+            '| EVAL label = "Stores an outsider reached", note = "Normal: 0", state = CASE(value > 0, "red", "green")'),
+        (4, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS first_t = MIN(@timestamp) "
+            '| EVAL value = TO_LONG(DATE_DIFF("days", first_t, NOW())), label = "Days since the first outside login", '
+            'note = CONCAT("First on ", DATE_FORMAT("yyyy-MM-dd", first_t), ". Normal: none"), state = CASE(value >= 0, "red", "green") '
+            "| KEEP value, label, note, state"),
+    ]
+    union = ", ".join(f"({q} | EVAL ord = {o})" for o, q in parts)
+    return f"FROM {union} | SORT ord | KEEP ord, label, value, note, state"
 
 
 def act3() -> Dash:
     d = Dash("coldchain-act3-history", "Act 3: The history nobody looked at",
-             "A year of store audit. The same internet address logged in to three stores months before the attack. Synthetic data.",
+             "Where the shared admin account logged in during the last 12 months. The same internet address visited three stores months before the attack. Synthetic data.",
              time=("now-1y", "now"))
-    metric(d, "Events in the history", "FROM logs-coldchain.audit-default | STATS events = COUNT(*)", "events", w=16)
-    metric(d, "Days of history", 'FROM logs-coldchain.audit-default | STATS days = DATE_DIFF("days", MIN(@timestamp), MAX(@timestamp))', "days", w=16, x=16)
-    metric(d, "Stores an outsider logged in to", f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} | STATS stores = COUNT_DISTINCT(retail.store.id)",
-           "stores", w=16, x=32)
-    for pn in d.panels:
-        pn["config"]["time_range"] = YEAR
-    d.row(6)
-    q = (f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} "
-         "| STATS first_seen = MIN(@timestamp) BY store = retail.store.id | EVAL days_ago = DATE_DIFF(\"days\", first_seen, NOW()), "
-         "first_seen_txt = DATE_FORMAT(\"yyyy-MM-dd HH:mm\", first_seen) | SORT first_seen | KEEP store, days_ago, first_seen_txt")
-    custom(d, "When the same address first logged in to each store", q, panels.FIRST_VISITS, w=48, h=12)
-    d.row(12)
-    q = (f"FROM logs-coldchain.audit-default | {OUTSIDE_LOGINS} "
+    custom(d, "Where admin logged in", history_map_query(), panels.history_map(), w=20, h=28, show_title=False)
+    custom(d, "History tiles", history_tiles_query(), panels.HISTORY_TILES, w=28, h=9, x=20, show_title=False)
+    d.row(9)
+    q = (f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} "
          "| STATS stores = COUNT_DISTINCT(retail.store.id) BY week = BUCKET(@timestamp, 1 week)")
     cfg = {"type": "xy", "layers": [{"type": "bar", "data_source": esql(q), "x": {"column": "week"},
                                      "y": [{"column": "stores", "label": "stores with an outside login", "color": {"type": "static", "color": RED}}]}],
            "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "stores per week", "visible": True}}},
-           "legend": {"visibility": "hidden"}, "time_range": YEAR}
-    d.add("Outside logins per week over the year", cfg, 48, 10, query=q)
-    d.row(10)
+           "legend": {"visibility": "hidden"}}
+    d.add("Outside admin logins per week (brush a range to zoom the page)", cfg, 28, 19, x=20, query=q)
+    d.row(19)
     return d
 
 

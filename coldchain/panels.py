@@ -185,8 +185,8 @@ ESTATE_TILES = BASE_CSS + """
 
 # Act 2: a map of the 20 stores. The base map (borders, regions, the Rhine) is real vector data from Natural Earth, baked into SVG paths
 # (coldchain/mapdata.py): custom panels cannot load map tiles. Rows: store, attacked, warm, x, y, town.
-def store_map(selected: str | None = None, town: str = "") -> str:
-    from .trucks import BAD_CABINETS
+def base_map() -> tuple[str, float, float]:
+    """The SVG paths of the Upper Rhine base map (borders, regions, the Rhine) and its size."""
     from .mapdata import COUNTRIES, REGIONS, RIVERS, VIEWBOX
     w, h = VIEWBOX
     land = {"France": "#6092C0", "Germany": "#F5A700", "Switzerland": "#9170B8"}
@@ -196,13 +196,81 @@ def store_map(selected: str | None = None, town: str = "") -> str:
                       for d in REGIONS.values())
     rivers = "".join(f'<path d="{d}" fill="none" stroke="#6092C0" stroke-opacity=".8" stroke-width="{4 if n in ("Rhin", "Rhine") else 1.6}" '
                      'stroke-linecap="round" stroke-linejoin="round"/>' for n, d in RIVERS.items())
+    return countries + regions + rivers, w, h
+
+
+def store_map(selected: str | None = None, town: str = "") -> str:
+    from .trucks import BAD_CABINETS
+    base, w, h = base_map()
     if selected:
         head = (f'<div class="zbar"><b>{selected} {town}</b> <span class="muted">the whole page shows this store</span>'
                 '<a href="/app/dashboards#/view/coldchain-act1b-estate">All stores</a></div>')
     else:
         head = '<div class="zbar"><span class="muted">Click a store to filter the page to it.</span></div>'
     return (STORE_MAP_TPL.replace("@@HEAD@@", head).replace("@@SEL@@", selected or "-").replace("@@W@@", str(w / 100)).replace("@@H@@", str(h / 100))
-            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", countries + regions + rivers).replace("@@LEGY@@", str(round(h - 32))).replace("@@LEGBOX@@", str(round(h - 46))).replace("@@BAD@@", str(BAD_CABINETS)))
+            .replace("@@VB@@", f"0 0 {w} {h}").replace("@@BASE@@", base).replace("@@LEGY@@", str(round(h - 32))).replace("@@LEGBOX@@", str(round(h - 46))).replace("@@BAD@@", str(BAD_CABINETS)))
+
+
+# Act 3: where did "admin" log in during the last 12 months? One bubble per store, sized by the number of admin logins; red when an address
+# that is neither a contractor nor a store LAN logged in. Rows: store, logins, outside, first_outside_txt, from_ip, x, y, town, r.
+HISTORY_MAP = BASE_CSS + """
+<style>
+.cc .map{max-width:540px;margin:0 auto;position:relative}
+.cc .zbar{font-size:13px;margin:0 8px 6px 8px}
+.cc .map svg{display:block}
+.cc .bub{cursor:default}
+.cc .bub:hover circle{stroke-width:4}
+</style>
+<div class="cc"><div class="zbar"><span class="muted">Where "admin" logged in, last 12 months. Bubble size is the number of logins; hover for the detail.</span></div><div class="map">
+<svg viewBox="@@VB@@" width="100%" role="img" aria-label="Admin logins per store">
+  @@BASE@@
+  <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
+  <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
+  <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
+  {% for row in rows %}
+  <g class="bub">
+    {% if row["outside"].value > 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | plus: 7 }}" fill="none" stroke="#BD271E" stroke-width="3"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" stroke="#fff" stroke-width="2.5" fill="{% if row["outside"].value > 0 %}#BD271E{% else %}#6092C0{% endif %}" fill-opacity=".92">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in the period{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first on {{ row["first_outside_txt"].value }}{% else %}, all from contractor addresses{% endif %}</title></circle>
+    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["logins"].value }}</text>
+  </g>
+  {% endfor %}
+  <rect x="8" y="@@LEGBOX@@" width="372" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">contractor logins</text>
+    <circle cx="190" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="204" y="@@LEGY@@" dy="4.5">an outside address logged in</text></g>
+  <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>
+</svg></div></div>
+"""
+
+
+def history_map() -> str:
+    base, w, h = base_map()
+    return (HISTORY_MAP.replace("@@BASE@@", base).replace("@@VB@@", f"0 0 {w} {h}").replace("@@LEGY@@", str(round(h - 32)))
+            .replace("@@LEGBOX@@", str(round(h - 46))))
+
+
+# Act 3: four cards with a coloured stripe. Rows: label, value, note, state (green or red).
+HISTORY_TILES = BASE_CSS + """
+<style>
+.cc{container-type:inline-size}
+.cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
+.cc .et.red{border-left-color:#BD271E}
+.cc .et .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .et .big{font-size:clamp(24px,2.8cqw,40px);font-weight:700;line-height:1.1}
+.cc .et.red .big{color:#BD271E}
+.cc .et .norm{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
+</style>
+<div class="cc"><div class="est">
+{% for row in rows %}
+<div class="et {{ row["state"].value }}">
+  <div class="lbl">{{ row["label"].value }}</div>
+  <div class="big">{{ row["value"].value }}</div>
+  <div class="norm">{{ row["note"].value }}</div>
+</div>
+{% endfor %}
+</div></div>
+"""
 
 
 STORE_MAP_TPL = BASE_CSS + """
@@ -275,26 +343,6 @@ STORE_MAP_TPL = BASE_CSS + """
 STORE_MAP = store_map()
 
 # Act 3: when the attacker's address first logged in to each store. Query: store, first_seen, days_ago, logins.
-FIRST_VISITS = BASE_CSS + """
-<style>
-.cc-row{display:flex;align-items:center;gap:10px;margin:6px 0}
-.cc-store-id{flex:0 0 46px;font-weight:700}
-.cc-track{flex:1;background:rgba(128,128,128,.18);border-radius:4px;height:22px;position:relative}
-.cc-bar{height:22px;border-radius:4px;background:#BD271E;min-width:6px}
-.cc-days{flex:0 0 190px;font-size:13px}
-</style>
-<div class="cc">
-{% if rows.size == 0 %}<p>No outside logins in the history.</p>{% endif %}
-{% for row in rows %}
-<div class="cc-row">
-  <div class="cc-store-id">{{ row["store"].value }}</div>
-  <div class="cc-track"><div class="cc-bar" style="width:{{ row["days_ago"].pct }}%"></div></div>
-  <div class="cc-days"><b>{{ row["days_ago"].value }} days ago</b> <span class="muted">{{ row["first_seen_txt"].value }}</span></div>
-</div>
-{% endfor %}
-<p class="muted">The same internet address, first successful login per store. Nothing changed then, so no alert could exist.</p></div>
-"""
-
 # Act 4: the findings of the hunting agent as cards. Query: severity, title, stores_txt, why_abnormal, proposed_action, tools_txt.
 FINDINGS = BASE_CSS + """
 <style>
