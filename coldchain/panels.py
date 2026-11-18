@@ -283,6 +283,78 @@ HISTORY_TILES = BASE_CSS + """
 """
 
 
+# Act 4: the agent's view of the estate on the same map. One dot per store, coloured by the worst finding there.
+# Rows: store, n (findings), worst (0 critical, 1 high, 2 medium, 3 none), titles, x, y, town.
+HUNT_MAP = BASE_CSS + """
+<style>
+.cc .map{max-width:540px;margin:0 auto;position:relative}
+.cc .zbar{font-size:13px;margin:0 8px 6px 8px}
+.cc .map svg{display:block}
+.cc .bub{cursor:default}
+.cc .bub:hover circle{stroke-width:4}
+</style>
+<div class="cc"><div class="zbar"><span class="muted">The worst finding of the hunting agent per store; the number is how many findings name the store.</span></div><div class="map">
+<svg viewBox="@@VB@@" width="100%" role="img" aria-label="Findings of the hunting agent per store">
+  @@BASE@@
+  <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
+  <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
+  <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
+  {% for row in rows %}
+  <g class="bub">
+    {% if row["worst"].value == 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="19" fill="none" stroke="#BD271E" stroke-width="2.5" stroke-dasharray="4 3"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{% if row["worst"].value == 3 %}8{% else %}12{% endif %}" stroke="#fff" stroke-width="2.5"
+      fill="{% if row["worst"].value == 0 %}#BD271E{% elsif row["worst"].value == 1 %}#F5A700{% elsif row["worst"].value == 2 %}#6092C0{% else %}#9AA7B8{% endif %}">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {% if row["n"].value > 0 %}{{ row["n"].value }} finding(s). {{ row["titles"].value }}{% else %}no finding names this store{% endif %}</title></circle>
+    {% if row["n"].value > 0 %}<text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["n"].value }}</text>{% endif %}
+  </g>
+  {% endfor %}
+  <rect x="8" y="@@LEGBOX@@" width="430" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">critical</text>
+    <circle cx="106" cy="@@LEGY@@" r="7" fill="#F5A700" stroke="#fff" stroke-width="1.5"/><text x="120" y="@@LEGY@@" dy="4.5">high</text>
+    <circle cx="176" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="190" y="@@LEGY@@" dy="4.5">medium</text>
+    <circle cx="272" cy="@@LEGY@@" r="6" fill="#9AA7B8" stroke="#fff" stroke-width="1.5"/><text x="286" y="@@LEGY@@" dy="4.5">no finding</text></g>
+  <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>
+</svg></div></div>
+"""
+
+
+def hunt_map() -> str:
+    base, w, h = base_map()
+    return (HUNT_MAP.replace("@@BASE@@", base).replace("@@VB@@", f"0 0 {w} {h}").replace("@@LEGY@@", str(round(h - 32)))
+            .replace("@@LEGBOX@@", str(round(h - 46))))
+
+
+# Act 4: four cards from one row: crit, high, medium, total, stores, tools, tools_total, last_min.
+HUNT_TILES = BASE_CSS + """
+<style>
+.cc{container-type:inline-size}
+.cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
+.cc .et.red{border-left-color:#BD271E}
+.cc .et.amber{border-left-color:#F5A700}
+.cc .et .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .et .big{font-size:clamp(24px,2.8cqw,40px);font-weight:700;line-height:1.1}
+.cc .et.red .big{color:#BD271E}
+.cc .et.amber .big{color:#B77A00}
+.cc .et .norm{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
+</style>
+{% for row in rows %}
+{% assign crit = row["crit"].value | default: 0 %}{% assign high = row["high"].value | default: 0 %}{% assign med = row["medium"].value | default: 0 %}
+{% assign serious = crit | plus: high %}
+<div class="cc"><div class="est">
+<div class="et{% if crit > 0 %} red{% elsif high > 0 %} amber{% endif %}"><div class="lbl">Critical and high findings</div><div class="big">{{ serious }}</div>
+  <div class="norm">{{ crit }} critical, {{ high }} high, {{ med }} medium. Normal: 0</div></div>
+<div class="et{% if row["stores"].value > 0 %} red{% endif %}"><div class="lbl">Stores named by a finding</div><div class="big">{{ row["stores"].value | default: 0 }}</div>
+  <div class="norm">of 20 stores. Normal: 0</div></div>
+<div class="et"><div class="lbl">Tools the agent used</div><div class="big">{{ row["tools"].value | default: 0 }}</div>
+  <div class="norm">of {{ row["tools_total"].value }}: audit, network, cabinets, trucks, ERP, POS</div></div>
+<div class="et{% if row["last_min"].value > 35 %} amber{% endif %}"><div class="lbl">Last hunt</div><div class="big">{{ row["last_min"].value | default: 0 }} min</div>
+  <div class="norm">ago. Every 30 minutes; it proposes and runs nothing</div></div>
+</div></div>
+{% endfor %}
+"""
+
+
 STORE_MAP_TPL = BASE_CSS + """
 <style>
 .cc .map{max-width:540px;margin:0 auto;position:relative}
@@ -356,23 +428,37 @@ STORE_MAP = store_map()
 # Act 4: the findings of the hunting agent as cards. Query: severity, title, stores_txt, why_abnormal, proposed_action, tools_txt.
 FINDINGS = BASE_CSS + """
 <style>
-.cc-find{margin:0 0 10px 0}
-.cc-find h4{margin:2px 0 4px 0;font-size:15px}
-.cc-find p{margin:2px 0;font-size:13px}
+.cc .fh{font-size:13px;margin:0 8px 8px 8px}
+.cc .cat{grid-column:1/-1;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.75;margin:10px 4px 0 4px}
+.cc .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cc .fnd{border:1px solid rgba(128,128,128,.35);border-left:10px solid #6092C0;border-radius:8px;padding:8px 14px}
+.cc .fnd.critical{border-left-color:#BD271E}
+.cc .fnd.high{border-left-color:#F5A700}
+.cc .fnd h4{margin:3px 0 4px 0;font-size:15px}
+.cc .fnd p{margin:2px 0;font-size:13px}
+.cc .src{display:inline-block;border-radius:10px;padding:0 8px;margin:2px 4px 0 0;font-size:11px;background:rgba(96,146,192,.2)}
+.cc .fnd .tag.critical{background:#BD271E}
+.cc .fnd .tag.high{background:#c98a00}
+.cc .fnd .tag.medium,.cc .fnd .tag.low{background:#6092C0}
 </style>
-<div class="cc">
+<div class="cc"><div class="fh"><b>Nobody asked.</b> Every 30 minutes a workflow asks the SOC agent to sweep the estate. It proposes, it runs nothing (Agent Builder and Workflows, preview).</div>
 {% if rows.size == 0 %}<p>No findings yet. The hunt runs every 30 minutes.</p>{% endif %}
+<div class="fgrid">
+{% assign prev = "" %}
 {% for row in rows %}
-<div class="card cc-find" style="border-left-color:{% if row["severity"].value == "critical" %}#BD271E{% elsif row["severity"].value == "high" %}#F5A700{% else %}#6092C0{% endif %}">
-  <span class="tag" style="background:{% if row["severity"].value == "critical" %}#BD271E{% elsif row["severity"].value == "high" %}#c98a00{% else %}#6092C0{% endif %}">{{ row["severity"].value }}</span>
+{% if row["cat_label"].value != prev %}<div class="cat">{{ row["cat_label"].value }}</div>{% assign prev = row["cat_label"].value %}{% endif %}
+<div class="fnd {{ row["severity"].value }}">
+  <span class="tag {{ row["severity"].value }}">{{ row["severity"].value }}</span>
   <span class="chip">{{ row["stores_txt"].value }}</span>
   <h4>{{ row["title"].value }}</h4>
   <p>{{ row["why_abnormal"].value }}</p>
   <p><b>Proposed:</b> {{ row["proposed_action"].value }}</p>
+  <div>{% assign srcs = row["tools_txt"].value | split: ", " %}{% for sr in srcs %}<span class="src">{{ sr | remove: "cc_" | replace: "_", " " }}</span>{% endfor %}</div>
 </div>
 {% endfor %}
-</div>
+</div></div>
 """
+
 
 # Act 5: the evidence on the back-office POS. Query: server, received_gb, chunks, nights, ja3, first_seen_txt.
 POS_EVIDENCE = BASE_CSS + """

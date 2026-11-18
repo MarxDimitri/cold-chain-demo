@@ -514,25 +514,51 @@ def pos() -> Dash:
     return d
 
 
+def hunt_map_query() -> str:
+    """One row per store (all 20): how many findings name it and the worst severity, with the titles for the tooltip."""
+    rank = 'CASE(severity == "critical", 0, severity == "high", 1, severity == "medium", 2, 3)'
+    return ('FROM (FROM cc-hunt-findings | MV_EXPAND stores | EVAL store = stores, rank = ' + rank +
+            " | STATS n = COUNT(*), worst = MIN(rank), titles = MV_CONCAT(MV_SORT(VALUES(title)), \" | \") BY store), "
+            '(FROM kb-assets | WHERE retail.device.role == "system-manager" | EVAL store = retail.store.id | KEEP store) '
+            "| STATS n = MAX(n), worst = MIN(worst), titles = MAX(titles) BY store "
+            f"| EVAL n = COALESCE(n, 0), worst = COALESCE(worst, 3), {geo_cases()} | SORT store")
+
+
+def hunt_tiles_query() -> str:
+    from . import agent
+    return ('FROM cc-hunt-findings | STATS crit = COUNT(*) WHERE severity == "critical", high = COUNT(*) WHERE severity == "high", '
+            'medium = COUNT(*) WHERE severity == "medium", total = COUNT(*), stores = COUNT_DISTINCT(stores), tools = COUNT_DISTINCT(tools), '
+            "newest = MAX(@timestamp) "
+            f'| EVAL last_min = DATE_DIFF("minutes", newest, NOW()), tools_total = {len(agent.TOOLS)}')
+
+
 def hunt() -> Dash:
     d = Dash("coldchain-hunt-findings", "Act 4: Hunting agent - the agent that keeps looking",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
-    d.panels.append(md("## Nobody asked, and something is going on\nEvery 30 minutes a workflow asks the SOC agent to sweep the estate: live "
-                       "data, a year of history, device profiles, exposure. It records what is abnormal, with a proposed action. It proposes, it "
-                       "runs nothing. **AlertZero is not offered on every deployment, so this is the same pattern built from Elastic Workflows and "
-                       "Agent Builder (preview).**", h=5, d=d))
-    d.row(5)
-    tiles = (("critical", "Critical findings", RED), ("high", "High findings", AMBER), ("medium", "Medium findings", "#6092C0"))
-    for i, (sev, title, color) in enumerate(tiles):
-        metric(d, title, f'FROM cc-hunt-findings | WHERE severity == "{sev}" | STATS findings = COUNT(*)', "findings", w=12, x=12 * i)
-        d.panels[-1]["config"]["metrics"][0]["color"] = {"type": "dynamic", "range": "absolute", "steps": [
-            {"lt": 1, "color": GREEN}, {"gte": 1, "color": color}]}
-    metric(d, "Stores involved", "FROM cc-hunt-findings | STATS stores = COUNT_DISTINCT(stores)", "stores", w=12, x=36)
-    d.row(6)
-    q = ("FROM cc-hunt-findings | EVAL rank = CASE(severity == \"critical\", 0, severity == \"high\", 1, severity == \"medium\", 2, 3) "
-         "| SORT rank, @timestamp DESC | LIMIT 12 | EVAL stores_txt = MV_CONCAT(stores, \", \") "
-         "| KEEP severity, title, stores_txt, why_abnormal, proposed_action")
-    custom(d, "What the agent found", q, panels.FINDINGS, w=48, h=26)
+    custom(d, "The agent's view of the estate", hunt_map_query(), panels.hunt_map(), w=20, h=28, show_title=False)
+    custom(d, "Hunt tiles", hunt_tiles_query(), panels.HUNT_TILES, w=28, h=9, x=20, show_title=False)
+    d.row(9)
+    q = ('FROM cc-hunt-findings | EVAL cat = CASE(category == "outside-access", "Outside access", category == "temperature", "Temperature", '
+         'category == "device-behaviour", "Device behaviour", category == "logistics", "Logistics", "Exposure") '
+         '| STATS critical = COUNT(*) WHERE severity == "critical", high = COUNT(*) WHERE severity == "high", '
+         'medium = COUNT(*) WHERE severity == "medium" BY cat | SORT cat')
+    cfg = {"type": "xy", "layers": [{"type": "bar_stacked", "data_source": esql(q), "x": {"column": "cat"},
+                                     "y": [{"column": "critical", "color": {"type": "static", "color": RED}},
+                                           {"column": "high", "color": {"type": "static", "color": AMBER}},
+                                           {"column": "medium", "color": {"type": "static", "color": "#6092C0"}}]}],
+           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "findings", "visible": True}}},
+           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
+    d.add("Findings by kind and severity", cfg, 28, 19, x=20, query=q)
+    d.row(19)
+    q = ("FROM cc-hunt-findings "
+         '| EVAL sev_rank = CASE(severity == "critical", 0, severity == "high", 1, severity == "medium", 2, 3), '
+         'cat_rank = CASE(category == "outside-access", 0, category == "temperature", 1, category == "device-behaviour", 2, '
+         'category == "logistics", 3, 4), '
+         'cat_label = CASE(category == "outside-access", "Outside access", category == "temperature", "Temperature", '
+         'category == "device-behaviour", "Device behaviour", category == "logistics", "Logistics (trucks and the ERP)", "Exposure") '
+         '| SORT cat_rank, sev_rank, @timestamp DESC | LIMIT 40 | EVAL stores_txt = MV_CONCAT(stores, ", "), tools_txt = MV_CONCAT(tools, ", ") '
+         "| KEEP cat_label, severity, title, stores_txt, why_abnormal, proposed_action, tools_txt")
+    custom(d, "What the agent found", q, panels.FINDINGS, w=48, h=26, show_title=False)
     d.row(26)
     return d
 
