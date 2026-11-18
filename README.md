@@ -100,7 +100,7 @@ the 46 setpoint changes after 5 s, rule 1 alerts after about 1.5 minutes, rule 2
 make reset-demo SINCE=<replay start, printed by the run>
 ```
 
-Removes the indexed run, the alerts and the hunt findings, and measures the Act 0 catalog again. `SINCE` is the replay's start
+Removes the indexed run, the alerts and the hunt findings, and reloads the Act 0 catalog (the sizes on the dashboard are counted live). `SINCE` is the replay's start
 (T0 minus 3 minutes), after the pre-roll, so the context stays and the next run starts quickly.
 
 ## 6. Tear down
