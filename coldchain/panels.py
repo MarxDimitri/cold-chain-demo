@@ -58,9 +58,16 @@ def _lamp_svg(lit: bool) -> str:
   </g>
   <text x="34" y="144" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
   <text x="34" y="68" font-size="13" fill="{ink}">cabinets, probes, POS terminals</text>
-  <g fill="{shape}" fill-opacity=".55"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
-    <rect x="720" y="130" width="130" height="14" rx="5"/></g>
-  <text x="720" y="68" font-size="13" fill="{ink}">inventory, limits, profiles, manuals</text>
+  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+    <g transform="translate(700,82)"><path d="M3 14l18-9 18 9v22l-18 9-18-9z"/><path d="M3 14l18 9 18-9M21 23v22"/></g>
+    <g transform="translate(748,82)"><path d="M4 38a20 20 0 1 1 34 0"/><line x1="21" y1="36" x2="30" y2="18"/><circle cx="21" cy="36" r="2.5"/><line x1="4" y1="44" x2="38" y2="44"/></g>
+    <g transform="translate(796,82)"><rect x="2" y="6" width="40" height="34" rx="4"/><circle cx="14" cy="19" r="5"/><path d="M6 33c1-6 11-6 16 0M28 17h10M28 25h10"/></g>
+    <g transform="translate(846,82)"><path d="M21 12c-4-4-12-5-18-3v32c6-2 14-1 18 3 4-4 12-5 18-3V9c-6-2-14-1-18 3z"/><line x1="21" y1="12" x2="21" y2="44"/></g>
+    <g transform="translate(896,82)"><rect x="2" y="10" width="40" height="28" rx="4"/><line x1="2" y1="28" x2="42" y2="28"/><circle cx="34" cy="33" r="1.8"/><line x1="9" y1="33" x2="20" y2="33"/></g>
+    <g transform="translate(944,80)"><ellipse cx="22" cy="10" rx="16" ry="6"/><path d="M6 10v28c0 3 7 6 16 6s16-3 16-6V10M6 24c0 3 7 6 16 6s16-3 16-6"/></g>
+  </g>
+  <text x="720" y="144" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
+  <text x="720" y="68" font-size="13" fill="{ink}">inventory, limits, profiles, manuals, files, ERP</text>
   <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
   <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">OBSERVABILITY REALM</text>
   <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[0]}</text>
