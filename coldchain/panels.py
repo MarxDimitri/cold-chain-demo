@@ -221,7 +221,7 @@ HISTORY_MAP = BASE_CSS + """
 .cc .bub{cursor:default}
 .cc .bub:hover circle{stroke-width:4}
 </style>
-<div class="cc"><div class="zbar"><span class="muted">Where "admin" logged in, last 12 months. Bubble size is the number of logins; hover for the detail.</span></div><div class="map">
+<div class="cc"><div class="zbar"><span class="muted">Where "admin" logged in, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }} UTC{% endif %}{% endfor %}. Bubble size is the number of logins in that period; hover for the detail.</span></div><div class="map">
 <svg viewBox="@@VB@@" width="100%" role="img" aria-label="Admin logins per store">
   @@BASE@@
   <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
@@ -231,7 +231,7 @@ HISTORY_MAP = BASE_CSS + """
   <g class="bub">
     {% if row["outside"].value > 0 %}<circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value | plus: 7 }}" fill="none" stroke="#BD271E" stroke-width="3"/>{% endif %}
     <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{{ row["r"].value }}" stroke="#fff" stroke-width="2.5" fill="{% if row["outside"].value > 0 %}#BD271E{% else %}#6092C0{% endif %}" fill-opacity=".92">
-      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in the period{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first on {{ row["first_outside_txt"].value }}{% else %}, all from contractor addresses{% endif %}</title></circle>
+      <title>{{ row["store"].value }} {{ row["town"].value }}: {{ row["logins"].value }} admin logins in this period{% if row["outside"].value > 0 %}, {{ row["outside"].value }} from an outside address ({{ row["from_ip"].value }}), first in this period on {{ row["first_outside_txt"].value }}{% else %}, all from contractor addresses{% endif %}</title></circle>
     <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["logins"].value }}</text>
   </g>
   {% endfor %}

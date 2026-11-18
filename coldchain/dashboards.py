@@ -422,21 +422,22 @@ def history_map_query() -> str:
             "ips = VALUES(ip) WHERE is_out BY store = retail.store.id "
             "| INLINE STATS most = MAX(logins) "
             '| EVAL r = ROUND(9 + 13 * SQRT(logins / TO_DOUBLE(most)), 1), first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), from_ip = MV_CONCAT(ips, ", "), '
+            'from_lbl = DATE_FORMAT("yyyy-MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("yyyy-MM-dd HH:mm", ?_tend), '
             f"{geo_cases()} | SORT store")
 
 
 def history_tiles_query() -> str:
     parts = [
         (1, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} | STATS value = COUNT(*) "
-            '| EVAL label = "Admin logins", note = "all stores, in the period", state = "green"'),
+            '| EVAL label = "Admin logins", note = "all stores, in the selected period", state = "green"'),
         (2, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT(*) "
             '| EVAL label = "Logins from outside addresses", note = "Normal: 0 (contractors and store LANs only)", '
             'state = CASE(value > 0, "red", "green")'),
         (3, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS value = COUNT_DISTINCT(retail.store.id) "
             '| EVAL label = "Stores an outsider reached", note = "Normal: 0", state = CASE(value > 0, "red", "green")'),
-        (4, f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} | STATS first_t = MIN(@timestamp) "
-            '| EVAL value = TO_LONG(DATE_DIFF("days", first_t, NOW())), label = "Days since the first outside login", '
-            'note = CONCAT("First on ", DATE_FORMAT("yyyy-MM-dd", first_t), ". Normal: none"), state = CASE(value >= 0, "red", "green") '
+        (4, f"FROM logs-coldchain.audit-default | WHERE @timestamp >= NOW() - 365 days AND {ADMIN} AND {OUTSIDE} | STATS first_t = MIN(@timestamp) "
+            '| EVAL value = TO_LONG(DATE_DIFF("days", first_t, NOW())), label = "Days since the first outside login (12 months)", '
+            'note = CONCAT("First on ", DATE_FORMAT("yyyy-MM-dd", first_t), " (always the full year). Normal: none"), state = CASE(value >= 0, "red", "green") '
             "| KEEP value, label, note, state"),
     ]
     union = ", ".join(f"({q} | EVAL ord = {o})" for o, q in parts)
@@ -451,12 +452,12 @@ def act3() -> Dash:
     custom(d, "History tiles", history_tiles_query(), panels.HISTORY_TILES, w=28, h=9, x=20, show_title=False)
     d.row(9)
     q = (f"FROM logs-coldchain.audit-default | WHERE {T} AND {ADMIN} AND {OUTSIDE} "
-         "| STATS stores = COUNT_DISTINCT(retail.store.id) BY week = BUCKET(@timestamp, 1 week)")
+         "| STATS logins = COUNT(*) BY week = BUCKET(@timestamp, 40, ?_tstart, ?_tend)")  # about 40 bars, whatever the period
     cfg = {"type": "xy", "layers": [{"type": "bar", "data_source": esql(q), "x": {"column": "week"},
-                                     "y": [{"column": "stores", "label": "stores with an outside login", "color": {"type": "static", "color": RED}}]}],
-           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "stores per week", "visible": True}}},
-           "legend": {"visibility": "hidden"}}
-    d.add("Outside admin logins per week (brush a range to zoom the page)", cfg, 28, 19, x=20, query=q)
+                                     "y": [{"column": "logins", "label": "outside admin logins", "color": {"type": "static", "color": RED}}]}],
+           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "outside admin logins", "visible": True}}},
+           "legend": {"visibility": "hidden"}, "styling": {"overlays": {"partial_buckets": {"visible": True}}}}
+    d.add("Outside admin logins over time (brush a range to zoom the page)", cfg, 28, 19, x=20, query=q)
     d.row(19)
     return d
 
