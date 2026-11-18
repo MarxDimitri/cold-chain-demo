@@ -17,12 +17,12 @@ version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is pres
 
 | Time | Dashboard (Kibana) | What the audience sees |
 |---|---|---|
-| 0:00 | **CC Act 0: The realms you usually do not watch** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
-| 1:30 | **CC Act 1: One cabinet, the contractor's view** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
-| 3:00 | **CC Act 2: The same blip across the whole estate, not on SOC's radar** | Twenty stores in one look: 46 setpoint changes in 3 stores, one of them from inside the store. |
-| 5:30 | **CC Act 3: The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
-| 8:00 | **CC Act 4: Hunting agent - the agent that keeps looking** | Nobody asked, and something is going on: findings with evidence, including a POS terminal talking to the refrigeration controller. |
-| 11:30 | **CC Act 5: The POS that nobody watched** | The evidence: a 4 GB night-time download, its CPU, its disk, the first time it reached the controller. |
+| 0:00 | **Act 0: The streetlight effect - we search where the light is** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
+| 1:30 | **Act 1: One cabinet, the contractor's view** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
+| 3:00 | **Act 2: The same blip across the whole estate, not on SOC's radar** | Twenty stores in one look: 46 setpoint changes in 3 stores, one of them from inside the store. |
+| 5:30 | **Act 3: The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
+| 8:00 | **Act 4: Hunting agent - the agent that keeps looking** | Nobody asked, and something is going on: findings with evidence, including a POS terminal talking to the refrigeration controller. |
+| 11:30 | **Act 5: The POS that nobody watched** | The evidence: a 4 GB night-time download, its CPU, its disk, the first time it reached the controller. |
 | 14:30 | | Rules detect, the agent hunts, the same language everywhere. |
 
 `docs/story-flow.md` has the stage script and `docs/plan-simplified.md` the decisions behind this version.

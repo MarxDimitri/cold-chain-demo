@@ -161,22 +161,24 @@ def lines(d: Dash, title: str, q: str, x_col: str, y_cols: list[str], w: int = 4
 THOUSANDS = r'REPLACE(TO_STRING({col}), "(\\d)(?=(\\d{{3}})+$)", "$1,")'
 
 
-def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10, x: int = 0) -> None:
+def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10, x: int = 0, show_title: bool = True) -> None:
     """A Serverless custom panel (`custom_content`): one ES|QL query, filled into an HTML, CSS and Liquid template."""
-    d.panels.append({"type": "custom_content", "grid": {"x": x, "y": d.y, "w": w, "h": h},
-                     "config": {"title": title, "template": template, "esql_query": [q]}})
+    cfg = {"template": template, "esql_query": [q]}
+    if show_title:
+        cfg = {"title": title, **cfg}
+    d.panels.append({"type": "custom_content", "grid": {"x": x, "y": d.y, "w": w, "h": h}, "config": cfg})
     d.queries.append((title, q, {}))
 
 
 # --- Act 0: the realms you usually do not watch ------------------------------------------------------------------------
 
 def act0() -> Dash:
-    d = Dash("coldchain-act0-sources", "CC Act 0: The realms you usually do not watch",
+    d = Dash("coldchain-act0-sources", "Act 0: The streetlight effect - we search where the light is",
              "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
              time=("now-24h", "now"))
     q = ("FROM kb-sources | SORT tier_order, rows DESC "
          "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, label, what, rows_txt, days")
-    custom(d, "The streetlight effect: we search where the light is", q, panels.REALMS, w=48, h=36)
+    custom(d, "The realms", q, panels.REALMS, w=48, h=36, show_title=False)
     d.row(36)
     return d
 
@@ -216,7 +218,7 @@ STORE_QUERY = """FROM (FROM metrics-coldchain.case-default
 def act1a() -> Dash:
     """What one contractor sees: a single cabinet, no estate, no alerts. Same indexed data as 1b, filtered to one device."""
     cab = f'device.id == "{CONTRACTOR_CABINET}"'
-    d = Dash("coldchain-act1a-cabinet", "CC Act 1: One cabinet, the contractor's view",
+    d = Dash("coldchain-act1a-cabinet", "Act 1: One cabinet, the contractor's view",
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
     custom(d, "Store 07, Colmar, from above: what each system says", STORE_QUERY, panels.STORE_LAYOUT, w=48, h=32)
     d.row(32)
@@ -249,7 +251,7 @@ def act1a() -> Dash:
 
 
 def act1() -> Dash:
-    d = Dash("coldchain-act1b-estate", "CC Act 2: The same blip across the whole estate, not on SOC's radar",
+    d = Dash("coldchain-act1b-estate", "Act 2: The same blip across the whole estate, not on SOC's radar",
              "Synthetic data, fictional chain: 20 stores, 480 cabinets. Central IT's view.")
     metric(d, "Parameter changes", f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
                                    '| STATS changes = COUNT(*)', "changes", x=0,
@@ -316,7 +318,7 @@ YEAR = {"from": "now-1y", "to": "now"}
 
 
 def act3() -> Dash:
-    d = Dash("coldchain-act3-history", "CC Act 3: The history nobody looked at",
+    d = Dash("coldchain-act3-history", "Act 3: The history nobody looked at",
              "A year of store audit. The same internet address logged in to three stores months before the attack. Synthetic data.",
              time=("now-1y", "now"))
     metric(d, "Events in the history", "FROM logs-coldchain.audit-default | STATS events = COUNT(*)", "events", w=16)
@@ -362,7 +364,7 @@ EVIDENCE = """FROM logs-network_traffic.tls-pos
 
 
 def pos() -> Dash:
-    d = Dash("coldchain-pos-evidence", "CC Act 5: The POS that nobody watched",
+    d = Dash("coldchain-pos-evidence", "Act 5: The POS that nobody watched",
              "Hypothetical scenario, synthetic data: a back-office POS PC downloads 4 GB at night and then reaches the refrigeration system manager.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
     custom(d, "What the S07 back-office POS talked to that its profile does not allow", EVIDENCE, panels.POS_EVIDENCE, w=48, h=9)
@@ -392,7 +394,7 @@ def pos() -> Dash:
 
 
 def hunt() -> Dash:
-    d = Dash("coldchain-hunt-findings", "CC Act 4: Hunting agent - the agent that keeps looking",
+    d = Dash("coldchain-hunt-findings", "Act 4: Hunting agent - the agent that keeps looking",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
     d.panels.append(md("## Nobody asked, and something is going on\nEvery 30 minutes a workflow asks the SOC agent to sweep the estate: live "
                        "data, a year of history, device profiles, exposure. It records what is abnormal, with a proposed action. It proposes, it "

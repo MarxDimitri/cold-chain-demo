@@ -1,4 +1,4 @@
-"""The catalog of every source of truth in the demo, measured from the cluster, for the dashboard "CC Act 0".
+"""The catalog of every source of truth in the demo, measured from the cluster, for the dashboard "Act 0".
 
     python -m coldchain.sources              # measure every source and load kb-sources (seconds)
 
