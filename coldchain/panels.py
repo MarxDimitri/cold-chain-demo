@@ -83,7 +83,6 @@ REALMS = BASE_CSS + """
 <div class="card lit" style="grid-column:1/-1"><span class="zone">under the light</span><b>Endpoints, firewalls, identity</b>
   <div class="muted">The crown jewels. Your SIEM and EDR already cover them: not part of this demo.</div></div>
 {% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}""" + CARD + """{% endif %}{% endfor %}
-<div class="cc-sub">In the dark: security data the usual tools do not cover</div>
 {% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}""" + CARD + """{% endif %}{% endfor %}
 </div></div>
 <div class="cc-col"><div class="cc-cards">
