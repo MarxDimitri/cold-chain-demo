@@ -176,8 +176,8 @@ def act0() -> Dash:
              time=("now-24h", "now"))
     q = ("FROM kb-sources | SORT tier_order, rows DESC "
          "| EVAL rows_txt = " + THOUSANDS.format(col="rows") + " | KEEP tier, label, what, rows_txt, days")
-    custom(d, "The streetlight effect: we search where the light is", q, panels.REALMS, w=48, h=22)
-    d.row(22)
+    custom(d, "The streetlight effect: we search where the light is", q, panels.REALMS, w=48, h=36)
+    d.row(36)
     return d
 
 

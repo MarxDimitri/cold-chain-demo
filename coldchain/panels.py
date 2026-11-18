@@ -18,46 +18,58 @@ BASE_CSS = """
 </style>
 """
 
+SEC, OBS, KBC = "#F04E98", "#00BFB3", "#FEC514"  # realm colours: Security, Observability, Knowledge base
+
 LAMP_SVG = """
-<svg viewBox="0 0 260 372" width="100%" style="max-width:300px" role="img" aria-label="A streetlight">
+<svg viewBox="0 0 1000 250" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F5A700" stop-opacity=".8"/><stop offset="1" stop-color="#F5A700" stop-opacity=".1"/>
+      <stop offset="0" stop-color="#F04E98" stop-opacity=".85"/><stop offset="1" stop-color="#F04E98" stop-opacity=".12"/>
     </linearGradient>
   </defs>
-  <text x="130" y="16" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">what you usually watch:</text>
-  <text x="130" y="33" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">endpoints, firewalls, identity</text>
-  <polygon points="118,98 142,98 236,296 24,296" fill="url(#beam)"/>
-  <ellipse cx="130" cy="298" rx="110" ry="12" fill="#F5A700" fill-opacity=".28"/>
-  <rect x="126" y="76" width="8" height="222" rx="3" fill="#69707D"/>
-  <path d="M126 82 Q126 52 168 50" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <rect x="136" y="76" width="44" height="16" rx="6" fill="#343741" transform="translate(-6 -12)"/>
-  <ellipse cx="136" cy="94" rx="15" ry="5" fill="#FFE9A8"/>
-  <text x="130" y="326" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">in the dark:</text>
-  <text x="130" y="343" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">the cold chain, the POS,</text>
-  <text x="130" y="360" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">a year of history</text>
+  <rect x="0" y="0" width="330" height="204" rx="8" fill="#00BFB3" fill-opacity=".14"/>
+  <rect x="670" y="0" width="330" height="204" rx="8" fill="#FEC514" fill-opacity=".16"/>
+  <rect x="330" y="0" width="340" height="204" fill="#F04E98" fill-opacity=".07"/>
+  <polygon points="488,56 512,56 664,204 336,204" fill="url(#beam)"/>
+  <rect x="496" y="60" width="8" height="144" rx="3" fill="#69707D"/>
+  <path d="M496 66 Q496 34 536 32" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <rect x="518" y="22" width="44" height="16" rx="6" fill="#343741"/>
+  <ellipse cx="540" cy="42" rx="15" ry="5" fill="#FFE9A8"/>
+  <g fill="#00BFB3" fill-opacity=".55"><rect x="34" y="118" width="38" height="70" rx="4"/><rect x="82" y="118" width="38" height="70" rx="4"/>
+    <rect x="130" y="118" width="38" height="70" rx="4"/><rect x="178" y="118" width="38" height="70" rx="4"/><rect x="226" y="118" width="38" height="70" rx="4"/></g>
+  <text x="34" y="100" font-size="13" fill="currentColor" opacity=".8">cabinets, probes, POS terminals</text>
+  <g fill="#FEC514" fill-opacity=".7"><rect x="720" y="118" width="130" height="22" rx="6"/><rect x="720" y="146" width="130" height="22" rx="6"/>
+    <rect x="720" y="174" width="130" height="22" rx="6"/></g>
+  <text x="720" y="100" font-size="13" fill="currentColor" opacity=".8">inventory, limits, profiles, manuals</text>
+  <rect x="0" y="204" width="1000" height="4" fill="currentColor" opacity=".35"/>
+  <text x="165" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#00857c">OBSERVABILITY REALM: in the dark</text>
+  <text x="500" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#C2327A">SECURITY REALM: under the light</text>
+  <text x="835" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#946b00">KNOWLEDGE BASE REALM: in the dark</text>
+  <text x="500" y="246" text-anchor="middle" font-size="12" fill="currentColor" opacity=".75">what you usually watch: endpoints, firewalls, identity</text>
 </svg>
 """
 
-# Act 0: the streetlight and the realms the demo reads. Query: kb-sources (tier, label, what, rows, days).
+# Act 0: the streetlight over three realms and the sources of each. Query: kb-sources (tier, label, what, rows_txt, days).
 REALMS = BASE_CSS + """
 <style>
-.cc-top{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
-.cc-lamp{flex:0 0 290px}
-.cc-grid{flex:1;min-width:360px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.cc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:14px}
+.cc-head{grid-column:1/-1;font-weight:700;font-size:14px;padding:4px 0 0 0}
 </style>
-<div class="cc"><div class="cc-top">
-<div class="cc-lamp">""" + LAMP_SVG + """</div>
+<div class="cc">""" + LAMP_SVG + """
 <div class="cc-grid">
+{% assign last = "" %}
 {% for row in rows %}
-<div class="card" style="border-left-color:{% if row["tier"].value == "Live data" %}#6092C0{% elsif row["tier"].value == "Knowledge base" %}#F5A700{% else %}#D36086{% endif %}">
-  <div class="muted">{{ row["tier"].value }}</div>
+{% if row["tier"].value != last %}
+<div class="cc-head" style="color:{% if row["tier"].value == "Security realm" %}#C2327A{% elsif row["tier"].value == "Observability realm" %}#00857c{% else %}#946b00{% endif %}">{{ row["tier"].value }}</div>
+{% assign last = row["tier"].value %}
+{% endif %}
+<div class="card" style="border-left-color:{% if row["tier"].value == "Security realm" %}#F04E98{% elsif row["tier"].value == "Observability realm" %}#00BFB3{% else %}#FEC514{% endif %}">
   <b>{{ row["label"].value }}</b>
   <div class="num">{{ row["rows_txt"].value }}</div>
   <div class="muted">{{ row["what"].value }}</div>
 </div>
 {% endfor %}
-</div></div></div>
+</div></div>
 """
 
 # Act 2: one tile per store. Query: per store, the cabinets whose setpoint was raised, and the warm ones now.

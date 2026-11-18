@@ -2,7 +2,7 @@
 
     python -m coldchain.sources              # measure every source and load kb-sources (seconds)
 
-`kb-sources` has one row per source: its tier, what it holds, how many rows, how far back it reaches and the question it answers.
+`kb-sources` has one row per source: its realm (Security, Observability or Knowledge base), what it holds, how many rows, how far back it reaches and the question it answers.
 The dashboard reads it with ES|QL.
 """
 from __future__ import annotations
@@ -15,18 +15,20 @@ from elasticsearch import helpers
 
 from .elastic import client
 
-LIVE, KB, PRODUCED = "Live data", "Knowledge base", "Findings"
-TIER_ORDER = {LIVE: 1, KB: 2, PRODUCED: 3}
+SECURITY, OBSERVABILITY, KB = "Security realm", "Observability realm", "Knowledge base realm"
+TIER_ORDER = {SECURITY: 1, OBSERVABILITY: 2, KB: 3}
 
 # (source as written after FROM, tier, what it holds, has a time field)
 SOURCES: list[tuple[str, str, str, bool]] = [
-    ("logs-coldchain.case-default", LIVE, "Cabinet telemetry every minute: air, setpoint, defrost relay", True),
-    ("logs-coldchain.audit-default", LIVE, "Controller logins, setpoint changes, defrost commands: a year of history", True),
-    ("logs-coldchain.probe-default", LIVE, "Independent temperature probes, every 5 minutes, on their own uplink", True),
-    ("logs-netflow.summary-default", LIVE, "5-minute network summaries per device pair", True),
-    ("logs-netflow.summary-pos", LIVE, "Network summaries around the POS terminals (hypothetical scenario)", True),
-    ("logs-network_traffic.tls-pos", LIVE, "TLS sessions of the S07 back-office POS: server names, fingerprints", True),
-    ("logs-pos.terminal-pos", LIVE, "POS terminal health: CPU, disk, transactions per minute", True),
+    ("logs-coldchain.audit-default", SECURITY, "Controller logins, setpoint changes, defrost commands: a year of history", True),
+    ("logs-netflow.summary-default", SECURITY, "5-minute network summaries per device pair", True),
+    ("logs-netflow.summary-pos", SECURITY, "Network summaries around the POS terminals (hypothetical scenario)", True),
+    ("logs-network_traffic.tls-pos", SECURITY, "TLS sessions of the S07 back-office POS: server names, fingerprints", True),
+    (".alerts-security.alerts-default", SECURITY, "Alerts of the detection rules", True),
+    ("cc-hunt-findings", SECURITY, "Findings of the scheduled hunting agent", True),
+    ("logs-coldchain.case-default", OBSERVABILITY, "Cabinet telemetry every minute: air, setpoint, defrost relay", True),
+    ("logs-coldchain.probe-default", OBSERVABILITY, "Independent temperature probes, every 5 minutes, on their own uplink", True),
+    ("logs-pos.terminal-pos", OBSERVABILITY, "POS terminal health: CPU, disk, transactions per minute", True),
     ("kb-assets", KB, "Every device: role, model, firmware, exposure, contractor account", False),
     ("kb-assets-by-ip", KB, "The same devices keyed by IP address", False),
     ("kb-controller-limits", KB, "Documented and curated normal setpoints, with manual page references", False),
@@ -34,8 +36,6 @@ SOURCES: list[tuple[str, str, str, bool]] = [
     ("kb-manuals", KB, "Short paraphrased controller manual facts", False),
     ("kb-regulations", KB, "Short paraphrased food-temperature and NIS2 facts", False),
     ("kb-baselines", KB, "What is normal for the Act 2 tiles, with provenance", False),
-    (".alerts-security.alerts-default", PRODUCED, "Alerts of the detection rules", True),
-    ("cc-hunt-findings", PRODUCED, "Findings of the scheduled hunting agent", True),
 ]
 
 
