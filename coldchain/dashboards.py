@@ -354,12 +354,6 @@ def act1() -> Dash:
           "| STATS alerts = COUNT(*) BY store = kibana.alert.suppression.terms.value, rule | SORT store", "store", ["alerts"], w=18, h=10, x=30,
           by="rule", kind="bar", ytitle="alerts")
     d.row(10)
-    table(d, "What central IT knows about the estate (inventory), and what reports live",
-          'FROM kb-assets | EVAL role = COALESCE(retail.device.role, "cabinet") | STATS devices = COUNT(*) BY role '
-          '| EVAL live_feed = CASE(role == "cabinet", "telemetry and audit", role == "temperature-logger", "probe readings", '
-          'role == "system-manager", "audit and flows", role IN ("pos-lane", "pos-backoffice"), "network flows (scenario)", "inventory only") | SORT devices DESC | KEEP role, devices, live_feed',
-          ["role", "devices", "live_feed"], h=9)
-    d.row(9)
     return d
 
 
