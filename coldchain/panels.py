@@ -49,8 +49,14 @@ def _lamp_svg(lit: bool) -> str:
   <path d="M496 52 Q496 26 536 24" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
   <rect x="518" y="14" width="44" height="16" rx="6" fill="#343741"/>
   <ellipse cx="540" cy="34" rx="15" ry="5" fill="#FFE9A8"/>
-  <g fill="{shape}" fill-opacity=".55"><rect x="34" y="86" width="38" height="52" rx="4"/><rect x="82" y="86" width="38" height="52" rx="4"/>
-    <rect x="130" y="86" width="38" height="52" rx="4"/><rect x="178" y="86" width="38" height="52" rx="4"/><rect x="226" y="86" width="38" height="52" rx="4"/></g>
+  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+    <g transform="translate(30,80)"><rect x="2" y="8" width="42" height="40" rx="3"/><line x1="2" y1="22" x2="44" y2="22"/><line x1="2" y1="35" x2="44" y2="35"/><path d="M23 0v6M19 3l4 3 4-3"/></g>
+    <g transform="translate(88,80)"><rect x="2" y="4" width="38" height="26" rx="3"/><path d="M21 30v8M10 46h22M14 38h14v8"/><line x1="8" y1="12" x2="34" y2="12"/><line x1="8" y1="19" x2="24" y2="19"/></g>
+    <g transform="translate(142,78)"><rect x="6" y="2" width="30" height="52" rx="4"/><line x1="6" y1="22" x2="36" y2="22"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="12" y1="28" x2="12" y2="38"/></g>
+    <g transform="translate(196,78)"><rect x="16" y="2" width="10" height="34" rx="5"/><circle cx="21" cy="44" r="9"/><line x1="21" y1="12" x2="21" y2="44"/></g>
+    <g transform="translate(244,82)"><rect x="2" y="4" width="46" height="38" rx="3"/><circle cx="12" cy="14" r="2.5"/><circle cx="22" cy="14" r="2.5"/><circle cx="32" cy="14" r="2.5"/><rect x="9" y="24" width="32" height="10" rx="2"/><path d="M10 42v6M20 42v6M30 42v6M40 42v6"/></g>
+  </g>
+  <text x="34" y="144" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
   <text x="34" y="68" font-size="13" fill="{ink}">cabinets, probes, POS terminals</text>
   <g fill="{shape}" fill-opacity=".55"><rect x="720" y="86" width="130" height="14" rx="5"/><rect x="720" y="108" width="130" height="14" rx="5"/>
     <rect x="720" y="130" width="130" height="14" rx="5"/></g>
