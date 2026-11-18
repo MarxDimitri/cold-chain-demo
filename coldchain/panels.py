@@ -18,7 +18,7 @@ BASE_CSS = """
 </style>
 """
 
-LIGHT, DARK, STRIPE_DARK = "#FEC514", "#14161b", "#69707D"  # yellow is the light, black is the dark
+LIGHT, DARK, STRIPE_DARK = "#FEC514", "#2c2f38", "#69707D"  # yellow is the light, black is the dark
 
 LIT_PAGE = "coldchain-act0-lit"
 DARK_PAGE = "coldchain-act0-sources"
@@ -28,8 +28,8 @@ def _lamp_svg(lit: bool) -> str:
     """The streetlight over three realms. Dark: the beam lights the centre, the sides are black. Lit: the beam reaches everything."""
     side_fill = '<rect x="0" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' \
                 '<rect x="670" y="0" width="330" height="150" rx="8" fill="#FEC514" fill-opacity=".13"/>' if lit else \
-                '<rect x="0" y="0" width="330" height="150" rx="8" fill="#14161b"/>' \
-                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#14161b"/>'
+                '<rect x="0" y="0" width="330" height="150" rx="8" fill="#2c2f38"/>' \
+                '<rect x="670" y="0" width="330" height="150" rx="8" fill="#2c2f38"/>'
     beam = '<polygon points="488,42 512,42 1000,150 0,150" fill="url(#beam)"/>' if lit else \
            '<polygon points="488,42 512,42 664,150 336,150" fill="url(#beam)"/>'
     ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
@@ -57,7 +57,6 @@ def _lamp_svg(lit: bool) -> str:
     <g transform="translate(244,82)"><rect x="2" y="4" width="46" height="38" rx="3"/><circle cx="12" cy="14" r="2.5"/><circle cx="22" cy="14" r="2.5"/><circle cx="32" cy="14" r="2.5"/><rect x="9" y="24" width="32" height="10" rx="2"/><path d="M10 42v6M20 42v6M30 42v6M40 42v6"/></g>
   </g>
   <text x="34" y="144" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
-  <text x="34" y="68" font-size="13" fill="{ink}">cabinets, probes, POS terminals</text>
   <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
     <g transform="translate(700,82)"><path d="M3 14l18-9 18 9v22l-18 9-18-9z"/><path d="M3 14l18 9 18-9M21 23v22"/></g>
     <g transform="translate(748,82)"><path d="M4 38a20 20 0 1 1 34 0"/><line x1="21" y1="36" x2="30" y2="18"/><circle cx="21" cy="36" r="2.5"/><line x1="4" y1="44" x2="38" y2="44"/></g>
@@ -67,7 +66,6 @@ def _lamp_svg(lit: bool) -> str:
     <g transform="translate(944,80)"><ellipse cx="22" cy="10" rx="16" ry="6"/><path d="M6 10v28c0 3 7 6 16 6s16-3 16-6V10M6 24c0 3 7 6 16 6s16-3 16-6"/></g>
   </g>
   <text x="720" y="144" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
-  <text x="720" y="68" font-size="13" fill="{ink}">inventory, limits, profiles, manuals, files, ERP</text>
   <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
   <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">OBSERVABILITY REALM</text>
   <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[0]}</text>
@@ -126,7 +124,7 @@ def realms(lit: bool) -> str:
 .cc .card{position:relative}
 .cc .card b{display:block;padding-right:70px}
 .cc .card.lit{background:rgba(254,197,20,.16);border-left-color:#FEC514}
-.cc .card.dark{background:#14161b;color:#e8eaf0;border-color:#2b2f38;border-left-color:#69707D}
+.cc .card.dark{background:#2c2f38;color:#e8eaf0;border-color:#3d414c;border-left-color:#69707D}
 .cc .card.dark .muted{color:#c3c8d4;opacity:.85}
 .cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7}
 .cc .card.dark .zone{color:#c3c8d4}
