@@ -221,7 +221,7 @@ HISTORY_MAP = BASE_CSS + """
 .cc .bub{cursor:default}
 .cc .bub:hover circle{stroke-width:4}
 </style>
-<div class="cc"><div class="zbar"><span class="muted">Where "admin" logged in, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }} UTC{% endif %}{% endfor %}. Bubble size is the number of logins in that period; hover for the detail.</span></div><div class="map">
+<div class="cc"><div class="zbar"><span class="muted">Admin logins per store, {% for row in rows %}{% if forloop.first %}{{ row["from_lbl"].value }} to {{ row["to_lbl"].value }}{% endif %}{% endfor %} (bubble size: number of logins)</span></div><div class="map">
 <svg viewBox="@@VB@@" width="100%" role="img" aria-label="Admin logins per store">
   @@BASE@@
   <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
@@ -235,7 +235,7 @@ HISTORY_MAP = BASE_CSS + """
     <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["logins"].value }}</text>
   </g>
   {% endfor %}
-  <rect x="8" y="@@LEGBOX@@" width="372" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <rect x="8" y="@@LEGBOX@@" width="420" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
   <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#6092C0" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">contractor logins</text>
     <circle cx="190" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="204" y="@@LEGY@@" dy="4.5">an outside address logged in</text></g>
   <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>

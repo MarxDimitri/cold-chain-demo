@@ -291,8 +291,10 @@ from .geo import STORE_GEO  # noqa: E402  (towns of the stores, shared with the 
 def geo_cases() -> str:
     """ES|QL EVAL fragment: map position (x, y in the base map's units) and town of the store in column `store`."""
     from . import mapdata
-    xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S, 1)}' for k, v in STORE_GEO.items())
-    ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S, 1)}' for k, v in STORE_GEO.items())
+    # Strasbourg, Schiltigheim, Illkirch and Kehl are within 5 km: nudge them apart so the dots do not cover each other
+    nudge = {"S02": (-13, -11), "S08": (-15, 12), "S11": (17, 0), "S01": (0, 4)}
+    xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S + nudge.get(k, (0, 0))[0], 1)}' for k, v in STORE_GEO.items())
+    ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S + nudge.get(k, (0, 0))[1], 1)}' for k, v in STORE_GEO.items())
     towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
     return f'x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "")'
 
@@ -301,16 +303,13 @@ def store_map_query() -> str:
     """Rows for the map: one per store (cabinets at +50, warm, bad frozen cabinets right now, position) and one per truck (position,
     cargo, next stop from the ERP plan, minutes to the planned arrival)."""
     from . import mapdata, trucks
-    xs = ", ".join(f'store == "{k}", {round((v[0] - mapdata.LON0) * mapdata.K * mapdata.S, 1)}' for k, v in STORE_GEO.items())
-    ys = ", ".join(f'store == "{k}", {round((mapdata.LAT1 - v[1]) * mapdata.S, 1)}' for k, v in STORE_GEO.items())
-    towns = ", ".join(f'store == "{k}", "{v[2]}"' for k, v in STORE_GEO.items())
     stores = ("FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - " + NOMINAL +
               " | STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "
               "warm = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 10 minutes AND rise > 2 AND coldchain.case.defrost.active == false "
               "AND coldchain.case.setpoint > 5, "
               "bad_now = COUNT_DISTINCT(device.id) WHERE @timestamp >= NOW() - 15 minutes AND @timestamp <= NOW() AND coldchain.application == \"frozen\" "
               f"AND {trucks.BAD_CABINET} BY store = retail.store.id "
-              f'| EVAL kind = "store", x = CASE({xs}, 0.0), y = CASE({ys}, 0.0), town = CASE({towns}, "")')
+              f'| EVAL kind = "store", {geo_cases()}')
     tx = f"ROUND((ST_X(host.geo.location) - {mapdata.LON0}) * {mapdata.K} * {mapdata.S}, 1)"
     ty = f"ROUND(({mapdata.LAT1} - ST_Y(host.geo.location)) * {mapdata.S}, 1)"
     fleet = (trucks.upcoming_stops() + " | INLINE STATS first_arr = MIN(erp.delivery.planned_arrival) BY device.id "
@@ -420,9 +419,9 @@ def history_map_query() -> str:
             f"| EVAL is_out = {OUTSIDE}, ip = TO_STRING(source.ip) "
             "| STATS logins = COUNT(*), outside = COUNT(*) WHERE is_out, first_outside = MIN(@timestamp) WHERE is_out, "
             "ips = VALUES(ip) WHERE is_out BY store = retail.store.id "
-            "| INLINE STATS most = MAX(logins) "
-            '| EVAL r = ROUND(9 + 13 * SQRT(logins / TO_DOUBLE(most)), 1), first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), from_ip = MV_CONCAT(ips, ", "), '
-            'from_lbl = DATE_FORMAT("yyyy-MM-dd HH:mm", ?_tstart), to_lbl = DATE_FORMAT("yyyy-MM-dd HH:mm", ?_tend), '
+            "| INLINE STATS most = MAX(logins), least = MIN(logins) "
+            '| EVAL r = ROUND(9 + 6 * (logins - least) / TO_DOUBLE(CASE(most > least, most - least, 1)), 1), first_outside_txt = DATE_FORMAT("yyyy-MM-dd", first_outside), from_ip = MV_CONCAT(ips, ", "), '
+            'from_lbl = DATE_FORMAT("yyyy-MM-dd", ?_tstart), to_lbl = DATE_FORMAT("yyyy-MM-dd", ?_tend), '
             f"{geo_cases()} | SORT store")
 
 
