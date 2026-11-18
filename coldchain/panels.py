@@ -35,8 +35,19 @@ def _lamp_svg(lit: bool) -> str:
     ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
     cap = ("in the light", "everything in the light", "in the light") if lit else \
           ("in the dark", "the crown jewels in the light, the rest in the dark", "in the dark")
+    def label(cx: float, title: str, sub: str, pill: bool, anchor: str = "middle") -> str:
+        """A realm label at the top of its zone. A yellow pill (dark text) reads on any theme; on dark grey the text is light."""
+        x = cx - 100 if anchor == "middle" else cx
+        tx = cx if anchor == "middle" else cx + 10
+        box = f'<rect x="{x}" y="8" width="200" height="40" rx="8" fill="#FEC514"/>' if pill else ""
+        t, u = ("#1d1e24", "#3b3d46") if pill else ("#f2f4f8", "#c3c8d4")
+        return (f'{box}<text x="{tx}" y="26" text-anchor="{anchor}" font-size="13" font-weight="700" fill="{t}">{title}</text>'
+                f'<text x="{tx}" y="41" text-anchor="{anchor}" font-size="11" fill="{u}">{sub}</text>')
+
+    labels = (label(165, "OBSERVABILITY REALM", cap[0], lit) + label(835, "KNOWLEDGE BASE REALM", cap[2], lit)
+              + label(340, "SECURITY REALM", cap[1], True, "start"))
     return f"""
-<svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
+<svg viewBox="0 0 1000 156" width="100%" role="img" aria-label="A streetlight over three realms">
   <defs>
     <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
@@ -71,13 +82,7 @@ def _lamp_svg(lit: bool) -> str:
     <g transform="translate(944,80)"><ellipse cx="22" cy="10" rx="16" ry="6"/><path d="M6 10v28c0 3 7 6 16 6s16-3 16-6V10M6 24c0 3 7 6 16 6s16-3 16-6"/></g>
   </g>
   <text x="720" y="144" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
-  <rect x="0" y="150" width="1000" height="4" fill="currentColor" opacity=".35"/>
-  <text x="165" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">OBSERVABILITY REALM</text>
-  <text x="165" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[0]}</text>
-  <text x="500" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">SECURITY REALM</text>
-  <text x="500" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[1]}</text>
-  <text x="835" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">KNOWLEDGE BASE REALM</text>
-  <text x="835" y="188" text-anchor="middle" font-size="11" fill="currentColor" opacity=".8">{cap[2]}</text>
+{labels}
 </svg>
 """
 
