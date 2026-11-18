@@ -290,19 +290,22 @@ def estate_tiles_query() -> str:
         x = th[key]
         if x["direction"] == "down":
             return f'CASE({v} < {x["red_below"]}, "red", "green")'
+        if key == "cabinets-warm":  # stores, not cabinets: any alert is red
+            return f'CASE({v} >= 1, "red", "green")'
         if "amber" in x:
             return f'CASE({v} >= {x["red"]}, "red", {v} >= {x["amber"]}, "amber", "green")'
         return f'CASE({v} >= {x["red"]}, "red", "green")'
 
-    warm = (f"FROM metrics-coldchain.case-* | WHERE {T} AND @timestamp <= NOW() | INLINE STATS newest = MAX(@timestamp) "
-            f"| STATS late_warm = COUNT(*) WHERE {WARM_ROW}, relay_on = COUNT(*) WHERE coldchain.case.defrost.active == true "
-            "AND @timestamp >= newest - 60 minutes BY device.id | WHERE late_warm >= 3 AND relay_on == 0 | STATS value = COUNT(*)")
+    # Rule 2 ("warm for too long, no defrost") judges the last minutes of the data, so a cabinet that was warm and has been restored
+    # reads zero there; its alert stays. The tile counts the stores that rule 2 alerted on in the window.
+    warm = (f'FROM .alerts-security.alerts-default | WHERE {T} AND kibana.alert.rule.name LIKE "*warm for too long*" '
+            "| STATS value = COUNT_DISTINCT(kibana.alert.suppression.terms.value)")
     parts = [
         (1, "parameter-changes", "Parameter changes",
          f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" | STATS value = COUNT(*)'),
         (2, "cabinets-reporting", "Cabinets reporting",
          f"FROM metrics-coldchain.case-* | WHERE {T} | STATS value = COUNT_DISTINCT(device.id)"),
-        (3, "cabinets-warm", "Cabinets warm, no defrost", warm),
+        (3, "cabinets-warm", "Stores alerted: warm, no defrost", warm),
         (4, "open-alerts", "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T} | STATS value = COUNT(*)"),
     ]
     union = ", ".join(f'({q} | EVAL ord = {o}, key = "{k}", label = "{lab}")' for o, k, lab, q in parts)
@@ -346,22 +349,14 @@ def act1() -> Dash:
            "axis": {"x": {"title": {"visible": False}, "scale": "temporal"}, "y": {"title": {"text": "K above nominal (hottest and coolest store)", "visible": True}},
                     "y2": {"title": {"text": "setpoint changes per 5 minutes: raised (red), lowered (blue)", "visible": True}}},
            "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 48, 14, query=q)
+    d.add("The estate warms as the setpoints change: hottest and coolest store (median cabinet) and setpoint changes", cfg, 30, 14, query=q)
+    tbl = (f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
+           '| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT("MM-dd HH:mm", @timestamp), '
+           'change = CONCAT(TO_STRING(coldchain.parameter.value.old), " -> ", TO_STRING(coldchain.parameter.value.new)) '
+           "| RENAME retail.store.id AS store, device.id AS cabinet, user.name AS user, source.ip AS source "
+           "| KEEP time, store, cabinet, user, source, change")
+    table(d, "Latest parameter changes", tbl, ["time", "store", "cabinet", "user", "source", "change"], w=18, h=14, x=30)
     d.row(14)
-    table(d, "Latest parameter changes",
-          f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
-          "| SORT @timestamp DESC | LIMIT 15 | EVAL time = DATE_FORMAT(\"MM-dd HH:mm\", @timestamp) "
-          "| RENAME retail.store.id AS store, device.id AS cabinet, user.name AS user, source.ip AS source, "
-          "coldchain.parameter.code AS parameter, coldchain.parameter.value.old AS old, coldchain.parameter.value.new AS new "
-          "| KEEP time, store, cabinet, user, source, parameter, old, new",
-          ["time", "store", "cabinet", "user", "source", "parameter", "old", "new"], w=30, h=10)
-    lines(d, "Alerts per store and rule",
-          f'FROM .alerts-security.alerts-default | WHERE {T} AND kibana.alert.rule.name LIKE "Cold chain:*" '
-          '| EVAL rule = CASE(kibana.alert.rule.name LIKE "*outside documented*", "Setpoint outside normal", '
-          'kibana.alert.rule.name LIKE "*warm for too long*", "Warm, no defrost", kibana.alert.rule.name) '
-          "| STATS alerts = COUNT(*) BY store = kibana.alert.suppression.terms.value, rule | SORT store", "store", ["alerts"], w=18, h=10, x=30,
-          by="rule", kind="bar", ytitle="alerts")
-    d.row(10)
     return d
 
 
