@@ -245,6 +245,7 @@ _TILES_TPL = BASE_CSS + """
 .cc .tile{flex:1;min-height:170px;border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:12px 16px;
   display:flex;flex-direction:column;justify-content:center}
 .cc .tile.bad{border-left-color:#BD271E}
+.cc .back{font-size:13px}.cc .back a{color:#0B64DD;text-decoration:underline}
 .cc .tile .lbl{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
 .cc .tile .big{font-size:54px;font-weight:700;line-height:1.1;margin:4px 0}
 .cc .tile.bad .big{color:#BD271E}
@@ -259,6 +260,7 @@ _TILES_TPL = BASE_CSS + """
   {% elsif row["kind"].value == "changes" %}{% assign changes = row["changes"].value %}{% endif %}
 {% endfor %}
 <div class="cc"><div class="tiles">
+@@BACK@@
   <div class="tile{% if setpoint > @@SP@@ %} bad{% endif %}">
     <div class="lbl">Setpoint now · @@CAB@@</div>
     <div class="big">{{ setpoint }}<span class="unit"> °C</span></div>
@@ -286,6 +288,7 @@ def cabinet_tiles(cab: str = "S07-C05") -> str:
     chilled = int(cab[-2:]) > 16
     return (_TILES_TPL.replace("@@CAB@@", "C" + cab[-2:]).replace("@@SP@@", "5" if chilled else "-18")
             .replace("@@AIR@@", "8" if chilled else "-18").replace("@@KIND@@", "chilled" if chilled else "frozen")
+            .replace("@@BACK@@", "" if cab == "S07-C05" else '<div class="back"><a href="/app/dashboards#/view/coldchain-act1a-cabinet">\u2039 Back to C05, the contractor\'s cabinet</a></div>')
             .replace("@@NORMAL@@", "0 to +5 °C for a chilled cabinet" if chilled else "-28 to -18 °C for a frozen cabinet"))
 
 
@@ -315,8 +318,9 @@ _LAYOUT_TPL = BASE_CSS + """
     {% if row["setpoint"].value > 5 %}{% assign attacked = attacked | plus: 1 %}{% endif %}
   {% endif %}
 {% endfor %}
-<div class="cc" style="max-width:1280px;margin:0 auto">
-<svg viewBox="0 0 1200 560" width="100%" role="img" aria-label="Store 07 from above" font-family="inherit">
+<style>.cc a.cab{position:absolute;display:block;width:4.5%;height:6.79%;border-radius:6px;cursor:pointer}.cc a.cab:hover{outline:3px solid #0B64DD}</style>
+<div class="cc" style="max-width:1280px;margin:0 auto;position:relative">
+<svg style="display:block" viewBox="0 0 1200 560" width="100%" role="img" aria-label="Store 07 from above" font-family="inherit">
   <rect x="5" y="5" width="1190" height="550" rx="14" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".8"/>
 
   {% assign ci = 0 %}
@@ -326,10 +330,9 @@ _LAYOUT_TPL = BASE_CSS + """
     {% if row["setpoint"].value > 5 %}{% assign fill = "#9C3B26" %}{% assign stroke = "#6e2414" %}{% assign ink = "#ffffff" %}
     {% elsif ci > 15 %}{% assign fill = "#E4EAF7" %}{% assign stroke = "#9FB3D8" %}{% assign ink = "#1a1c21" %}
     {% else %}{% assign fill = "#CDEFEA" %}{% assign stroke = "#00BFB3" %}{% assign ink = "#1a1c21" %}{% endif %}
-    <a href="/app/dashboards#/view/{% if row["cab"].value == "S07-C05" %}coldchain-act1a-cabinet{% else %}coldchain-act1a-{{ row["cab"].value | downcase }}{% endif %}" style="cursor:pointer">
     <rect x="{{ x }}" y="{{ y }}" width="54" height="38" rx="6" fill="{{ fill }}" stroke="{% if row["cab"].value == "@@SEL@@" %}#1a1c21{% else %}{{ stroke }}{% endif %}" stroke-width="{% if row["cab"].value == "@@SEL@@" %}4{% else %}1.5{% endif %}">
       <title>{{ row["cab"].value }}: setpoint {{ row["setpoint"].value }} C, {{ row["readings"].value }} readings</title></rect>
-    <text x="{{ x | plus: 27 }}" y="{{ y | plus: 25 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text></a>
+    <text x="{{ x | plus: 27 }}" y="{{ y | plus: 25 }}" text-anchor="middle" font-size="13" font-weight="700" fill="{{ ink }}">{{ row["cab"].value | slice: 5, 2 }}</text>
     {% assign ci = ci | plus: 1 %}
   {% endif %}{% endfor %}
   <line x1="738" y1="95" x2="782" y2="95" stroke="#00BFB3" stroke-width="3" stroke-dasharray="7 5"/>
@@ -400,6 +403,13 @@ _LAYOUT_TPL = BASE_CSS + """
     <text x="977" y="468">refrigeration controller</text>
   </g>
 </svg>
+  {% assign ci = 0 %}
+  {% for row in rows %}{% if row["kind"].value == "cabinet" %}
+    {% assign col = ci | modulo: 12 %}{% assign line = ci | divided_by: 12 | floor %}
+    {% assign left = col | times: 60 | plus: 24 | divided_by: 12.0 %}{% assign top = line | times: 44 | plus: 22 | times: 100 | divided_by: 560.0 %}
+    <a class="cab" style="left:{{ left }}%;top:{{ top }}%" title="Open {{ row["cab"].value }}" href="/app/dashboards#/view/{% if row["cab"].value == "S07-C05" %}coldchain-act1a-cabinet{% else %}coldchain-act1a-{{ row["cab"].value | downcase }}{% endif %}"></a>
+    {% assign ci = ci | plus: 1 %}
+  {% endif %}{% endfor %}
 </div>
 """
 
@@ -411,9 +421,7 @@ def store_layout(cab: str = "S07-C05") -> str:
         cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline): the one cabinet the contractor sees. '
                'Click a cabinet number to look at it.</text>')
     else:
-        cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline) selected. '
-               '<a href="/app/dashboards#/view/coldchain-act1a-cabinet"><tspan fill="#0B64DD" text-decoration="underline">Back to C05, '
-               'the contractor\'s cabinet</tspan></a></text>')
+        cap = (f'<text x="24" y="128" font-size="12" fill="currentColor" opacity=".85">{n} (heavy outline) selected.</text>')
     return _LAYOUT_TPL.replace("@@SEL@@", cab).replace("@@CAPTION@@", cap)
 
 
