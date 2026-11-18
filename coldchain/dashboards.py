@@ -282,21 +282,42 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
     return d
 
 
+def estate_tiles_query() -> str:
+    """Four values, each looked up against its normal in kb-baselines; the stripe colour comes from the same thresholds as before."""
+    from .baselines import THRESHOLDS as th
+
+    def state(key: str, v: str = "value") -> str:
+        x = th[key]
+        if x["direction"] == "down":
+            return f'CASE({v} < {x["red_below"]}, "red", "green")'
+        if "amber" in x:
+            return f'CASE({v} >= {x["red"]}, "red", {v} >= {x["amber"]}, "amber", "green")'
+        return f'CASE({v} >= {x["red"]}, "red", "green")'
+
+    warm = (f"FROM metrics-coldchain.case-* | WHERE {T} AND @timestamp <= NOW() | INLINE STATS newest = MAX(@timestamp) "
+            f"| STATS late_warm = COUNT(*) WHERE {WARM_ROW}, relay_on = COUNT(*) WHERE coldchain.case.defrost.active == true "
+            "AND @timestamp >= newest - 60 minutes BY device.id | WHERE late_warm >= 3 AND relay_on == 0 | STATS value = COUNT(*)")
+    parts = [
+        (1, "parameter-changes", "Parameter changes",
+         f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" | STATS value = COUNT(*)'),
+        (2, "cabinets-reporting", "Cabinets reporting",
+         f"FROM metrics-coldchain.case-* | WHERE {T} | STATS value = COUNT_DISTINCT(device.id)"),
+        (3, "cabinets-warm", "Cabinets warm, no defrost", warm),
+        (4, "open-alerts", "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T} | STATS value = COUNT(*)"),
+    ]
+    union = ", ".join(f'({q} | EVAL ord = {o}, key = "{k}", label = "{lab}")' for o, k, lab, q in parts)
+    states = ", ".join(f'key == "{k}", {state(k)}' for _, k, _, _ in parts)
+    return (f"FROM {union} | EVAL kb.key = key | LOOKUP JOIN kb-baselines ON kb.key "
+            '| EVAL normal = ROUND(CASE(key == "parameter-changes", kb.baseline.value * DATE_DIFF("minutes", ?_tstart, ?_tend) / 1440.0, '
+            "kb.baseline.value), 0) "
+            f"| EVAL delta = TO_INTEGER(value - normal), normal = TO_INTEGER(normal), state = CASE({states}, \"green\") "
+            "| SORT ord | KEEP ord, label, value, normal, delta, state")
+
+
 def act1() -> Dash:
     d = Dash("coldchain-act1b-estate", "Act 2: The same blip across the whole estate, not on SOC's radar",
              "Synthetic data, fictional chain: 20 stores, 480 cabinets. Central IT's view.")
-    metric(d, "Parameter changes", f'FROM logs-coldchain.audit-* | WHERE {T} AND event.action == "parameter-change" '
-                                   '| STATS changes = COUNT(*)', "changes", x=0,
-           normal=("parameter-changes", True))
-    metric(d, "Cabinets reporting", f"FROM metrics-coldchain.case-* | WHERE {T} | STATS cabinets = COUNT_DISTINCT(device.id)",
-           "cabinets", x=12, normal=("cabinets-reporting", False))
-    metric(d, "Cabinets warm, no defrost",
-           f"FROM metrics-coldchain.case-* | WHERE {T} AND @timestamp <= NOW() | INLINE STATS newest = MAX(@timestamp) "
-           f"| STATS late_warm = COUNT(*) WHERE {WARM_ROW}, relay_on = COUNT(*) WHERE coldchain.case.defrost.active == true AND @timestamp >= newest - 60 minutes "
-           "BY device.id | WHERE late_warm >= 3 AND relay_on == 0 | STATS cabinets = COUNT(*)", "cabinets", x=24,
-           normal=("cabinets-warm", False))
-    metric(d, "Open alerts", f"FROM .alerts-security.alerts-default | WHERE {T} | STATS alerts = COUNT(*)", "alerts", x=36,
-           normal=("open-alerts", False))
+    custom(d, "Estate tiles", estate_tiles_query(), panels.ESTATE_TILES, w=48, h=6, show_title=False)
     d.row(6)
     q = (f"FROM metrics-coldchain.case-default | EVAL rise = coldchain.case.temperature.air - {NOMINAL} "
          "| STATS attacked = COUNT_DISTINCT(device.id) WHERE coldchain.case.setpoint > 5, "

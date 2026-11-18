@@ -153,14 +153,44 @@ REALMS = realms(False)
 REALMS_LIT = realms(True)
 
 # Act 2: one tile per store. Query: per store, the cabinets whose setpoint was raised, and the warm ones now.
+# Act 2: four estate tiles with a coloured stripe, like Act 1. Query rows: ord, label, value, normal, delta, state (green, amber, red).
+ESTATE_TILES = BASE_CSS + """
+<style>
+.cc .est{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:10px 16px}
+.cc .et.amber{border-left-color:#F5A700}
+.cc .et.red{border-left-color:#BD271E}
+.cc .et .lbl{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .et .big{font-size:40px;font-weight:700;line-height:1.15}
+.cc .et.red .big{color:#BD271E}
+.cc .et.amber .big{color:#B77A00}
+.cc .et .norm{font-size:13px;opacity:.85}
+.cc .et .state{font-size:12px;font-weight:700;color:#00857c}
+.cc .et.red .state{color:#BD271E}
+.cc .et.amber .state{color:#B77A00}
+</style>
+<div class="cc"><div class="est">
+{% for row in rows %}
+<div class="et {{ row["state"].value }}">
+  <div class="lbl">{{ row["label"].value }}</div>
+  <div class="big">{{ row["value"].value }}</div>
+  <div class="norm">Normal: {{ row["normal"].value }}</div>
+  <div class="state">{% if row["delta"].value > 0 %}&#9650; +{{ row["delta"].value }} above normal{% elsif row["delta"].value < 0 %}&#9660; {{ row["delta"].value }} below normal{% else %}= normal{% endif %}</div>
+</div>
+{% endfor %}
+</div></div>
+"""
+
+
 STORE_GRID = BASE_CSS + """
 <style>
 .cc-stores{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
-.cc-store{border-radius:6px;padding:8px 6px;text-align:center;color:#fff;background:#54B399}
+.cc-store{border:1px solid rgba(128,128,128,.35);border-left:8px solid #54B399;border-radius:6px;padding:8px 6px;text-align:center}
 .cc-store b{display:block;font-size:16px}
-.cc-store span{font-size:11px;opacity:.95}
-.cc-bad{background:#BD271E}
-.cc-warn{background:#F5A700;color:#1a1c21}
+.cc-store span{font-size:11px;opacity:.85}
+.cc-bad{border-left-color:#BD271E}
+.cc-bad b,.cc-bad span{color:#BD271E;opacity:1}
+.cc-warn{border-left-color:#F5A700}
 </style>
 <div class="cc"><div class="cc-stores">
 {% for row in rows %}
@@ -170,7 +200,7 @@ STORE_GRID = BASE_CSS + """
 </div>
 {% endfor %}
 </div>
-<p class="muted">Green: normal. Red: setpoints raised in the window. Amber: warm and not defrosting.</p></div>
+<p class="muted">Stripe: green normal, red setpoints raised in the window, amber warm and not defrosting.</p></div>
 """
 
 # Act 3: when the attacker's address first logged in to each store. Query: store, first_seen, days_ago, logins.
