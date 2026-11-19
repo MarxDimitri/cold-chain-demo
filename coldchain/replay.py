@@ -30,7 +30,7 @@ from .chain import ROOT, load_attack, load_chain, parse_ts
 from .netflow import Exporter
 from .network import WINDOW, flows
 from .sink import make_sink, write_chunk, write_records
-from . import trucks
+from . import osquery, trucks
 from .telemetry import PROBE_STEP, evaporator_series, probe_line, probe_offsets, store_series, telemetry_line
 
 STATE_DIR = ROOT / ".replay"
@@ -38,8 +38,9 @@ TRIGGER = STATE_DIR / "restore.trigger"
 S07_DIR = ROOT / "replay" / "s07"
 PREROLL = 180  # seconds before T0 (logins land at T0-140s)
 TAIL = 300     # seconds of data after the pull-down ends
+OSQUERY_AFTER = 180  # seconds after T0 at which the SOC's Osquery live query is answered (hypothetical)
 LAYERS = {"coldchain.case": ("detect",), "coldchain.probe": ("detect",), "coldchain.audit": ("detect",),
-          "netflow.summary": ("detect",), "netflow.log": (), "logistics.truck": ("detect",)}  # raw flows are generated for the attack plan but not written
+          "netflow.summary": ("detect",), "netflow.log": (), "logistics.truck": ("detect",), "osquery_manager.result": ("detect",)}  # raw flows are generated for the attack plan but not written
 
 
 class Replay:
@@ -80,6 +81,7 @@ class Replay:
         self.detect: dict[tuple, list[str]] = defaultdict(list)
         self.raw: dict[tuple, list[tuple[int, dict]]] = defaultdict(list)
         self.restore_t: int | None = None
+        self.osquery_done = False  # the SOC asks the endpoints once, a few minutes after T0
         self.stats = defaultdict(int)
 
     # --- time -----------------------------------------------------------------------------
@@ -211,6 +213,10 @@ class Replay:
                 if m % WINDOW == 0:
                     self.push_normal_flows(m)
                 self.push_trucks(fleet, m, history=step == 0)
+                if not self.osquery_done and m >= self.t0 + OSQUERY_AFTER:
+                    self.osquery_done = True
+                    for sid, line in osquery.results(iso(m), f"live-{iso(m)}"):
+                        self.push(m + 59, "osquery_manager.result", sid, line, ts=m)
 
                 i = (m - series_start) // 60
                 for store in self.chain.stores:

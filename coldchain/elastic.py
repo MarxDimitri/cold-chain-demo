@@ -38,6 +38,7 @@ DATASETS = {
     "coldchain.probe": ("logs", ["info"]),  # independent temperature loggers, outside the controller's trust
     "netflow.summary": ("logs", ["connection", "info"]),
     "pos.terminal": ("logs", ["info"]),  # POS scenario: hourly roll-ups per POS terminal (CPU, disk, transactions per minute)
+    "osquery_manager.result": ("logs", ["info"]),  # live query answers of the endpoints (synthetic, Osquery Manager shape)
     "logistics.truck": ("logs", ["info"]),  # truck telemetry: GPS, speed, cargo temperature (destination is in the ERP)
     "network_traffic.tls": ("logs", ["connection", "info"]),  # POS scenario: TLS sessions of the S07 back-office POS
 }
@@ -59,6 +60,8 @@ CUSTOM_MAPPINGS = {
                         "mapping": {"type": "keyword"}}},
         {"retail_strings": {"path_match": "retail.*", "match_mapping_type": "string",
                             "mapping": {"type": "keyword"}}},
+        {"osquery_strings": {"path_match": "osquery.*", "match_mapping_type": "string", "mapping": {"type": "keyword"}}},
+        {"action_strings": {"path_match": "action_data.*", "match_mapping_type": "string", "mapping": {"type": "keyword"}}},
     ],
     "properties": {
         "event": {"properties": {"ingested": {"type": "date"}}},  # ECS date; scenario B compares it with @timestamp
@@ -165,7 +168,21 @@ def setup(es: Elasticsearch) -> None:
 
 
 LOOKUP_FILES = ["kb-assets", "kb-assets-by-ip", "kb-controller-limits", "kb-device-profiles", "kb-manuals",
-                "kb-regulations", "kb-baselines", "kb-erp-deliveries"]
+                "kb-regulations", "kb-baselines", "kb-erp-deliveries", "kb-advisories"]
+
+
+LOOKUP_PROPERTIES = {
+    "kb-erp-deliveries": {
+        "kb": {"properties": {"key": kw()}},
+        "coldchain": {"properties": {"truck": {"properties": {"id": kw()}}}},
+        "retail": {"properties": {"store": {"properties": {"id": kw()}}}},
+        "erp": {"properties": {
+            "system": kw(),
+            "delivery": {"properties": {"id": kw(), "stop": {"type": "long"}, "planned_arrival": {"type": "date"}, "town": kw(),
+                                        "lon": {"type": "double"}, "lat": {"type": "double"}}},
+            "cargo": {"properties": {"type": kw(), "pallets": {"type": "long"}, "value_eur": {"type": "long"}}}}},
+    },
+}
 
 
 def lookups(es: Elasticsearch) -> None:
@@ -180,10 +197,11 @@ def lookups(es: Elasticsearch) -> None:
         # lookup side has to be keyword too. Free-text indices (manuals, regulations) keep the default.
         join_keys = [] if name in ("kb-manuals", "kb-regulations") else [
             {"all_strings": {"match_mapping_type": "string", "mapping": {"type": "keyword"}}}]
-        es.indices.create(index=name, settings={"index.mode": "lookup"},
-                          mappings={"dynamic_templates": CUSTOM_MAPPINGS["dynamic_templates"] + [
-                              {"kb_strings": {"path_match": "kb.*", "match_mapping_type": "string",
-                                              "mapping": {"type": "keyword"}}}] + join_keys})
+        mappings = {"dynamic_templates": CUSTOM_MAPPINGS["dynamic_templates"] + [
+            {"kb_strings": {"path_match": "kb.*", "match_mapping_type": "string", "mapping": {"type": "keyword"}}}] + join_keys}
+        if name in LOOKUP_PROPERTIES:  # an index that starts empty (filled by the replay) still needs its fields for the joins
+            mappings["properties"] = LOOKUP_PROPERTIES[name]
+        es.indices.create(index=name, settings={"index.mode": "lookup"}, mappings=mappings)
         helpers.bulk(es, ({"_index": name, "_source": d} for d in docs), refresh="wait_for")
         print(f"lookup index {name}: {len(docs)} docs")
 

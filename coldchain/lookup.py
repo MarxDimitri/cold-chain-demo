@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 
+from . import osquery
 from .chain import LOOKUP_DIR, cabinets, devices, load_chain
 from .defrost import config as defrost_config
 
@@ -192,6 +193,7 @@ def main() -> None:
     _write("kb-regulations", regulation_rows())
     _write("kb-assets", assets)
     _write("kb-assets-by-ip", by_ip)
+    _write("kb-advisories", osquery.advisory_rows())  # BSI warning on OpenJDK "Java4Shell", paraphrased
     _write("kb-erp-deliveries", [])  # the delivery plan is loaded by the replay (times are relative to T0)
 
 

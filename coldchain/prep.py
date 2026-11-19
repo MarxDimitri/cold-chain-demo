@@ -29,6 +29,11 @@ def clean(since: str) -> None:
         r = es.delete_by_query(index=ix, query={"range": {"event.ingested": {"gte": since}}}, conflicts="proceed",
                                refresh=True, wait_for_completion=True)
         print(f"clean: {ix}: removed {r['deleted']} documents ingested since {since}")
+    try:  # the live query answers of the run
+        r = es.delete_by_query(index="logs-osquery_manager.result-default", query={"match_all": {}}, conflicts="proceed", refresh=True)
+        print(f"clean: logs-osquery_manager.result-default: removed {r['deleted']} answers")
+    except Exception as e:
+        print(f"clean: osquery answers: skipped ({type(e).__name__})")
     try:  # the ERP plan of the run (its times are relative to that run's T0)
         r = es.delete_by_query(index="kb-erp-deliveries", query={"match_all": {}}, conflicts="proceed", refresh=True)
         print(f"clean: kb-erp-deliveries: removed {r['deleted']} delivery stops")
