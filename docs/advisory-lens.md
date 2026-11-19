@@ -14,15 +14,23 @@ not the cause. BSI knows of no attacks, and the data does not say how the attack
 
 | Piece | Where |
 |---|---|
-| The advisory as facts (paraphrased, one row per Java major version) | `kb-advisories`, `coldchain/osquery.py` `advisory_rows()` |
-| Live query answers: Java runtime, CPU flag, JVM command line, in the shape of Osquery Manager results | `logs-osquery_manager.result-default` (dataset `osquery_manager.result`) |
+| **The advisories as data** (paraphrased, with source): one entry per advisory, with release lines, affected-from and fixed-in versions, an optional CPU condition and mitigation arguments | `config/advisories.yaml`, loaded by `make lookups` into `kb-advisories` |
+| Live query answers: installed software (name, version), CPU flags, process command lines, in the shape of Osquery Manager results | `logs-osquery_manager.result-default` (dataset `osquery_manager.result`) |
 | Who answers: the back-office POS PC and the store server of every store (40); the POS lanes and the system managers are appliances without an agent; S12 and S16 are offline | `coldchain/osquery.py` |
 | When: the replay answers the live query at T0 + 3 minutes; `make osquery` answers it on demand | `coldchain/replay.py` |
-| Agent tools `cc_vulnerable_assets` and `cc_osquery_coverage`; hunt finding `vulnerable-runtime:estate` | `coldchain/agent.py`, `coldchain/hunt.py` |
-| Where it shows: the agent (Act 4: tools, finding and its answer); Act 5 has no panel for it | `coldchain/dashboards.py` `pos()` |
+| Agent tools `cc_list_advisories`, `cc_advisory_exposure` (parameter: the advisory id) and `cc_osquery_coverage`; hunt finding `advisory-exposure:<id>` | `coldchain/agent.py`, `coldchain/hunt.py` |
 
-A device is **affected** when its Java version is inside the affected range of the advisory row for its major version and its CPU has AVX-512 VBMI;
-**mitigated** when a JVM flag of the advisory (`-XX:-UseBASE64Intrinsics`, `-XX:UseAVX=2`) is on its command line. Thresholds come from `kb-advisories`, not from the query.
+## Open to any new advisory
+
+The prompts of the agent and of the hunt workflow name no vulnerability, product or version (a test checks this). They say: list the advisories, check
+the exposure for the ones that matter, report what the tools return. The tools read everything advisory-specific from `kb-advisories`. To add a new
+one: add an entry to `config/advisories.yaml` and run `make lookups` (or `python -m coldchain.elastic lookups`). The next question and the next hunt pick it up.
+A second advisory for the same software works with no change at all; an advisory for new software also needs the live query to collect that
+software (the answers carry name and version of the installed software, CPU flags and process command lines). In a real estate a feed (CERT-Bund,
+NVD, vendor advisories) would write the rows; the file is the demo's stand-in.
+
+A device is **affected** when its software is a product of the advisory, its version is in [affected from, fixed in) and, if the advisory requires a
+CPU flag, it has it; **mitigated** when a mitigation argument is on a process command line; devices whose software the advisory does not list are not affected.
 
 ## Honest limits (say them)
 

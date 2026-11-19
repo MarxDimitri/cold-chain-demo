@@ -8,8 +8,8 @@ also for machines that ship no logs. The stores of this demo are simulated, so t
 Manager results (`logs-osquery_manager.result`: `action_id`, `action_data`, `osquery.*`). Hypothetical, synthetic. Which osquery tables
 expose the CPU flag on a given POS platform has to be tested on real hardware.
 
-The advisory is BSI BITS-H 2026-306673-1032 (18.11.2026, TLP:CLEAR) on OpenJDK "Java4Shell", CVE-2026-114938, paraphrased in `advisory_rows()`.
-Only the agent-capable devices answer: the back-office POS PC and the store server of every store (the POS lanes and the system
+The advisories are data: `config/advisories.yaml`, loaded into `kb-advisories` (the first entry is the BSI warning on OpenJDK "Java4Shell",
+BITS-H 2026-306673-1032). Nothing in the agent's prompts names a vulnerability. Only the agent-capable devices answer: the back-office POS PC and the store server of every store (the POS lanes and the system
 manager are appliances without an agent). Two stores are offline and do not answer.
 """
 from __future__ import annotations
@@ -18,7 +18,10 @@ import json
 import sys
 from datetime import datetime, timezone
 
-SOURCE = "BSI BITS-H 2026-306673-1032, 18.11.2026 (TLP:CLEAR), paraphrased"
+import yaml
+
+from .chain import CONFIG_DIR
+
 OFFLINE = {"S12", "S16"}  # their agents do not check in
 
 # Back-office POS PC: Java version of the POS client; AVX-512 VBMI present?; JVM flag set?
@@ -39,31 +42,37 @@ SRV = {
 }
 
 QUERIES = {
-    "java_runtime": "SELECT name, version, path FROM file JOIN (parsed from the JDK release file) WHERE path LIKE '%/jvm/%/release'  -- or deb_packages / rpm_packages / programs",
-    "cpu_avx512": "SELECT feature, value FROM cpuid WHERE feature = 'avx512vbmi'  -- platform support to be tested",
-    "jvm_cmdline": "SELECT pid, cmdline FROM processes WHERE name = 'java'",
+    "software": "SELECT name, version FROM deb_packages / rpm_packages / programs  -- or the release file of a runtime; the installed software of the device",
+    "cpu": "SELECT feature FROM cpuid  -- or the flags line of /proc/cpuinfo; platform support to be tested",
+    "process": "SELECT name, pid, cmdline FROM processes",
 }
 
 
+def version_num(version: str) -> int:
+    """A dotted version (up to four parts) as one number that sorts like the version: 17.0.21.1 -> 17000021001."""
+    parts = [int(p) for p in version.split(".")][:4]
+    parts += [0] * (4 - len(parts))
+    return parts[0] * 10**9 + parts[1] * 10**6 + parts[2] * 10**3 + parts[3]
+
+
 def advisory_rows() -> list[dict]:
-    """The advisory as facts, one row per Java major version (affected from, fixed in), paraphrased from the BSI warning."""
-    common = {"kb": {"source": SOURCE}, "advisory": {
-        "id": "CVE-2026-114938", "name": "Java4Shell", "cvss_v4": 9.2, "cvss_v31": 8.1, "criticality": "2 / yellow",
-        "published": "2026-11-18",
-        "flaw": "memory corruption in the optimised Base64 decoder of OpenJDK (negative length on padding)",
-        "hardware": "only x86-64 with AVX-512 VBMI (Intel Xeon Ice Lake and later, AMD Zen 4 and later); ARM64 is not affected",
-        "condition": "the application passes attacker-controlled Base64 input to the decoder, for example HTTP Basic or SAML tokens",
-        "exploitation": "denial of service is easy, remote code execution is hard; no public exploit and no known attack, first attempts seen by Greynoise",
-        "workaround": "start the JVM with -XX:-UseBASE64Intrinsics or -XX:UseAVX=2, then restart it",
-        "mitigation": "update to a fixed OpenJDK and restart the Java processes; restrict access to Java applications reachable from the internet"}}
+    """`config/advisories.yaml` as rows of kb-advisories: one row per advisory, product and release line (the join keys are osquery.name and osquery.branch)."""
     rows = []
-    for major, min_update, fixed_update, fixed_sub in ((17, 6, 21, 1), (21, 0, 13, 1), (25, 0, 5, 1), (27, 0, 1, 1)):
-        r = json.loads(json.dumps(common))
-        r["kb"]["key"] = f"CVE-2026-114938:{major}"
-        r["osquery"] = {"major": major}
-        r["advisory"].update({"affected_min_update": min_update, "fixed_update": fixed_update, "fixed_sub": fixed_sub,
-                              "fixed_version": f"{major}.0.{fixed_update}.{fixed_sub}"})
-        rows.append(r)
+    for adv in yaml.safe_load((CONFIG_DIR / "advisories.yaml").read_text())["advisories"]:
+        args = list(adv.get("mitigation_args") or [])[:2] + [None, None]
+        for br in adv["branches"]:
+            fact = {k: adv[k] for k in ("id", "name", "source", "published", "cvss_v4", "cvss_v31", "criticality", "product", "process", "flaw",
+                                        "hardware", "condition", "exploitation", "workaround", "mitigation") if k in adv}
+            fact |= {"affected_from": br["affected_from"], "fixed_in": br["fixed_in"],
+                     "affected_from_num": version_num(br["affected_from"]), "fixed_in_num": version_num(br["fixed_in"])}
+            if adv.get("requires_cpu_flag"):
+                fact["requires_cpu_flag"] = adv["requires_cpu_flag"]
+            if args[0]:
+                fact["mitigation_arg_1"] = args[0]
+            if args[1]:
+                fact["mitigation_arg_2"] = args[1]
+            rows.append({"kb": {"key": f"{adv['id']}:{adv['product']}:{br['branch']}"}, "advisory": fact,
+                         "osquery": {"name": adv["product"], "branch": br["branch"]}})
     return rows
 
 
@@ -85,7 +94,10 @@ def plan() -> list[dict]:
 
 
 def results(ts_iso: str, action_id: str) -> list[tuple[str, str]]:
-    """The answers of one live query run: (store, NDJSON line) for every device that answers. Offline stores stay silent."""
+    """The answers of one live query run: (store, NDJSON line) for every device that answers. Offline stores stay silent.
+
+    Three generic queries per device: the installed software (name, version), the CPU flags and the process command lines.
+    """
     lines = []
     for d in plan():
         if d["store"] in OFFLINE:
@@ -95,11 +107,13 @@ def results(ts_iso: str, action_id: str) -> list[tuple[str, str]]:
                 "action_id": action_id, "host": {"name": d["host"]},
                 "agent": {"id": f"agent-{d['host'].lower()}", "type": "elastic-agent"},
                 "retail": {"store": {"id": d["store"]}, "device": {"role": d["role"]}}, "labels": {"synthetic": "true"}}
+        flags = "fpu sse4_2 avx2 bmi2" + (" avx512f avx512bw avx512vbmi" if d["avx512"] else "")
+        app = "posclient" if d["role"] == "pos-backoffice" else "storeserver"
         docs = [
-            ("java_runtime", {"name": "OpenJDK", "version": d["version"], "path": f"/usr/lib/jvm/openjdk-{major}/release",
-                              "major": major, "update": update, "sub": sub}),
-            ("cpu_avx512", {"feature": "avx512vbmi", "value": "1" if d["avx512"] else "0", "avx512vbmi": 1 if d["avx512"] else 0}),
-            ("jvm_cmdline", {"pid": "2417", "cmdline": f"java -Xmx2g {d['flag']} -jar {'posclient' if d['role'] == 'pos-backoffice' else 'storeserver'}.jar".replace("  ", " ")}),
+            ("software", {"name": "OpenJDK", "version": d["version"], "branch": str(major), "version_num": version_num(d["version"]),
+                          "path": f"/usr/lib/jvm/openjdk-{major}/release"}),
+            ("cpu", {"cpu_flags": flags}),
+            ("process", {"proc": "java", "pid": "2417", "cmdline": f"java -Xmx2g {d['flag']} -jar {app}.jar".replace("  ", " ")}),
         ]
         for qid, cols in docs:
             doc = {**base, "action_data": {"id": qid, "query": QUERIES[qid]}, "osquery": cols}
@@ -129,26 +143,39 @@ LATEST = ("FROM logs-osquery_manager.result-default | INLINE STATS newest = MAX(
           "| WHERE @timestamp >= newest - 30 minutes")  # the most recent live query run
 
 
-def vulnerable_query(keep: str = "") -> str:
-    """Per answering device: its Java runtime, CPU and JVM flags checked against the advisory (rows of kb-advisories).
+def list_advisories_query() -> str:
+    """The advisories the knowledge base holds, newest first (one row per advisory): id, name, product, published, severity, exploitation, source."""
+    return ("FROM kb-advisories | STATS name = MAX(advisory.name), product = MAX(advisory.product), published = MAX(advisory.published), "
+            "cvss_v4 = MAX(advisory.cvss_v4), criticality = MAX(advisory.criticality), flaw = MAX(advisory.flaw), "
+            "exploitation = MAX(advisory.exploitation), workaround = MAX(advisory.workaround), source = MAX(advisory.source) BY id = advisory.id "
+            "| SORT published DESC")
 
-    A device is affected when its Java is inside the affected range of the advisory for its major version (from the advisory row, not a
-    constant) and its CPU has AVX-512 VBMI; it is mitigated when a JVM flag of the advisory is set. Java versions the advisory does not
-    list (for example 11) are not affected.
+
+def exposure_query(advisory: str = "?advisory", keep: str = "") -> str:
+    """Per answering device: the installed software, CPU flags and process command lines of the latest live query checked against ONE advisory.
+
+    Everything advisory-specific comes from the rows of kb-advisories (product, release line, affected from, fixed in, required CPU flag,
+    mitigation arguments); the query names no product. The join key is the advisory id plus the product and release line of the device's software,
+    so a device whose software the advisory does not list simply has no row. A device is affected when its software is a product of the advisory, its version is
+    in [affected from, fixed in) and, if the advisory requires a CPU flag, the device has it; mitigated when a mitigation argument is on
+    a process command line. Devices whose software the advisory does not list are not affected.
     """
     return (f"{LATEST} "
-            '| STATS major = MAX(osquery.major) WHERE action_data.id == "java_runtime", upd = MAX(osquery.update) WHERE action_data.id == "java_runtime", '
-            'sub = MAX(osquery.sub) WHERE action_data.id == "java_runtime", vers = VALUES(osquery.version) WHERE action_data.id == "java_runtime", '
-            'avx = MAX(osquery.avx512vbmi) WHERE action_data.id == "cpu_avx512", '
-            'flagged = COUNT(*) WHERE action_data.id == "jvm_cmdline" AND (osquery.cmdline LIKE "*-XX:-UseBASE64Intrinsics*" OR osquery.cmdline LIKE "*-XX:UseAVX=2*") '
+            '| STATS ver = VALUES(osquery.version) WHERE action_data.id == "software", num = MAX(osquery.version_num) WHERE action_data.id == "software", '
+            'prod = VALUES(osquery.name) WHERE action_data.id == "software", br = VALUES(osquery.branch) WHERE action_data.id == "software", '
+            'flags = VALUES(osquery.cpu_flags) WHERE action_data.id == "cpu", cmds = VALUES(osquery.cmdline) WHERE action_data.id == "process" '
             "BY host = host.name, store = retail.store.id, role = retail.device.role "
-            "| EVAL osquery.major = major | LOOKUP JOIN kb-advisories ON osquery.major "
-            "| EVAL in_range = upd >= advisory.affected_min_update AND (upd < advisory.fixed_update OR (upd == advisory.fixed_update AND sub < advisory.fixed_sub)), "
-            "java = MV_FIRST(vers) "
-            '| EVAL status = CASE(in_range IS NULL OR in_range == false, "not affected: Java version", avx == 0, "not affected: CPU without AVX-512 VBMI", '
-            'flagged > 0, "affected, mitigated by a JVM flag", "affected"), '
-            'avx512 = CASE(avx == 1, "yes", "no") '
-            + (keep or "| SORT status, store, role | KEEP store, host, role, java, avx512, status"))
+            "| EVAL osquery.name = MV_FIRST(prod), osquery.branch = MV_FIRST(br), software = MV_FIRST(ver), cpu = MV_CONCAT(flags, \" \"), cmd = MV_CONCAT(cmds, \" \") "
+            f'| EVAL kb.key = CONCAT({advisory}, ":", osquery.name, ":", osquery.branch) | LOOKUP JOIN kb-advisories ON kb.key '
+
+            "| EVAL in_range = num >= advisory.affected_from_num AND num < advisory.fixed_in_num, "
+            "cpu_ok = advisory.requires_cpu_flag IS NULL OR CONTAINS(cpu, advisory.requires_cpu_flag), "
+            "mitigated = (advisory.mitigation_arg_1 IS NOT NULL AND CONTAINS(cmd, advisory.mitigation_arg_1)) "
+            "OR (advisory.mitigation_arg_2 IS NOT NULL AND CONTAINS(cmd, advisory.mitigation_arg_2)) "
+            '| EVAL status = CASE(in_range IS NULL OR in_range == false, "not affected: version not in the advisory", cpu_ok == false, '
+            '"not affected: CPU condition not met", mitigated, "affected, mitigated", "affected"), '
+            'cpu_condition = CASE(advisory.requires_cpu_flag IS NULL, "none", cpu_ok, "met", "not met") '
+            + (keep or "| SORT status, store, role | KEEP store, host, role, software, cpu_condition, status"))
 
 
 def coverage_query() -> str:

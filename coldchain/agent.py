@@ -5,7 +5,7 @@
     python -m coldchain.agent ask [QUESTION]   # ask the agent (needs an LLM connector on the deployment)
     python -m coldchain.agent delete
 
-Twelve ES|QL tools, one per step of the hunt. They read the indexed streams (the blip, a year of audit history, the POS evidence)
+Thirteen ES|QL tools, one per step of the hunt. They read the indexed streams (the blip, a year of audit history, the POS evidence)
 and the knowledge base (what is normal). The agent proposes containment; it does not change anything. Agent Builder is a
 preview feature: say so on stage.
 """
@@ -122,17 +122,22 @@ TOOLS = [
                     "truck_status is what the truck is doing now, which may be unloading at an EARLIER stop; only at_destination = true means it is at this store.",
      "params": {},
      "query": trucks.at_risk_query()},
-    {"id": "cc_vulnerable_assets",
-     "description": "Advisory lens, from the endpoints themselves: the latest Osquery live query answers (Java runtime and version, CPU with or without "
-                    "AVX-512 VBMI, JVM flags) of every agent-capable device (back-office POS PC and store server per store), checked against the BSI "
-                    "warning on OpenJDK Java4Shell (CVE-2026-114938, published 2026-11-18) in kb-advisories. Per device: store, host, role, Java "
-                    "version, AVX-512 yes or no, and a status: affected, affected mitigated by a JVM flag, not affected (Java version), "
-                    "not affected (CPU). Affected is an exposure, not evidence of compromise: BSI says no attacks are known. Synthetic data.",
+    {"id": "cc_list_advisories",
+     "description": "The security advisories the knowledge base holds, newest first: id, name, product, published date, criticality, flaw, what is known "
+                    "about exploitation, the workaround and the source. Call it first to learn which advisories exist; advisories are data and new ones appear over time.",
      "params": {},
-     "query": osquery.vulnerable_query()},
+     "query": osquery.list_advisories_query()},
+    {"id": "cc_advisory_exposure",
+     "description": "Exposure to ONE advisory, from the endpoints themselves: the latest Osquery live query answers (installed software and version, CPU flags, "
+                    "process command lines) of every agent-capable device (back-office POS PC and store server per store), checked against the advisory rows "
+                    "(product, release line, affected from, fixed in, required CPU flag, mitigation arguments). Per device: store, host, role, software version, "
+                    "whether the CPU condition is met, and a status: affected, affected mitigated, not affected (version not in the advisory) or not affected "
+                    "(CPU condition not met). An exposure is not evidence of compromise. Synthetic data.",
+     "params": {"advisory": {"type": "string", "description": "advisory id as returned by cc_list_advisories"}},
+     "query": osquery.exposure_query("?advisory")},
     {"id": "cc_osquery_coverage",
      "description": "How many of the 40 agent-capable devices (back-office POS PC and store server of each store) answered the latest Osquery live "
-                    "query, and which hosts are silent (offline agents). Always call it with cc_vulnerable_assets: a silent host is unknown, not safe. "
+                    "query, and which hosts are silent (offline agents). Always call it with cc_advisory_exposure: a silent host is unknown, not safe. "
                     "The POS lanes and the system managers are appliances without an agent and are not part of this.",
      "params": {},
      "query": osquery.coverage_query()},
@@ -161,12 +166,11 @@ the live detections, a year of audit history and the in-store network, and you a
    Say which trucks (id, ERP delivery id), to which store, how many minutes to the planned arrival and how many kilometres to go,
    the pallets and value in euros, and that the cargo is cold but the store is not. Propose: hold or reroute the delivery, or unload into the
    store's cold room instead of the cabinets; the logistics team decides. If the tool returns nothing, say no frozen delivery is heading to a store in trouble.
-5. THE ADVISORY LENS. Call cc_vulnerable_assets and cc_osquery_coverage. The BSI warned on 2026-11-18 about OpenJDK "Java4Shell". The endpoints were asked
-   directly (Osquery), also those that ship no logs. Say how many devices are affected (Java inside the affected range and a CPU with AVX-512 VBMI), how
-   many are mitigated by a JVM flag, how many answered of 40 and which hosts are silent (unknown, not safe). Name which of the hit stores (S07, S11, S19) have an
-   affected device and which do not (a hit store without an affected device shows that this advisory does not explain every hit). This is an exposure, never the cause: the BSI knows of no attacks and
-   the data does not say how the attacker got in. Propose: the JVM workaround (-XX:-UseBASE64Intrinsics or -XX:UseAVX=2) and a restart, then patching, first on affected devices in
-   stores with an outside login or a hit and on internet-reachable ones; ask the owners of silent hosts to check by hand.
+5. ADVISORIES. Call cc_list_advisories. For the advisory the question names, or the three newest when none is named, call cc_advisory_exposure with its id, and
+   cc_osquery_coverage once. Report per advisory, using only what the tools return: its id and name, how many devices are affected, mitigated and not affected, how many
+   answered of the expected and which hosts are silent (unknown, not safe), and which of the stores already hit or visited have an affected device and which have none.
+   An advisory is an exposure, never the cause: quote what it says about exploitation and say that the data does not show how the attacker got in. Propose the workaround
+   and the mitigation from the advisory, then patching, first on affected devices in hit or visited stores. If the list is empty, say so.
 6. WHAT IS NEXT. Call cc_exposed_controllers and subtract the stores already touched: every store with an outside login
    (cc_recent_outside_logins, live) or in cc_history_of_address or cc_estate_footprint (history, may lag a running attack). Name the stores still at risk and the
    shared contractor account. Propose containment (block the address, isolate the device, review the account, restore setpoints
@@ -179,7 +183,7 @@ announce that you are about to answer and never describe your plan."""
 DEFAULT_QUESTION = ("Something changed temperature setpoints in our stores. What happened, how long has the attacker been in, "
                     "how did it happen inside the store, which stores are next, and are any deliveries heading into trouble?")
 
-SAMPLE = {"minutes": 100000, "ip": "203.0.113.47", "store": "S07", "code": "setpoint"}
+SAMPLE = {"minutes": 100000, "ip": "203.0.113.47", "store": "S07", "code": "setpoint", "advisory": "CVE-2026-114938"}  # sample values for `check` only
 
 
 def tool_body(t: dict) -> dict:

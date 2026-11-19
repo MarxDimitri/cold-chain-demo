@@ -40,7 +40,7 @@ SOURCES: list[tuple[str, str, str, bool]] = [
     ("kb-manuals", KB, "Short paraphrased controller manual facts", False),
     ("kb-regulations", KB, "Short paraphrased food-temperature and NIS2 facts", False),
     ("kb-erp-deliveries", KB, "The ERP delivery plan: which truck delivers what to which store and when", False),
-    ("kb-advisories", KB, "Security advisories as facts: the BSI warning on OpenJDK Java4Shell (CVE-2026-114938), paraphrased", False),
+    ("kb-advisories", KB, "Security advisories as facts: affected products and versions, hardware condition, workaround, source (config/advisories.yaml)", False),
     ("kb-baselines", KB, "What is normal for the Act 2 tiles, with provenance", False),
 ]
 
