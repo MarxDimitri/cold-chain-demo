@@ -1,6 +1,6 @@
 import yaml
 
-from coldchain.hunt import EVERY, INDEX, NAME, SCHEMA, workflow_yaml
+from coldchain.hunt import EVERY, INDEX, MESSAGE, NAME, SCHEMA, workflow_yaml
 
 
 def test_workflow_yaml_parses_and_wires_the_agent_to_the_index():
@@ -15,4 +15,4 @@ def test_workflow_yaml_parses_and_wires_the_agent_to_the_index():
 
 
 def test_visited_but_unchanged_stores_are_one_grouped_finding():
-    assert "ONE finding together" in hunt.MESSAGE and "first-visit:" in hunt.MESSAGE and "joined with `+`" in hunt.MESSAGE
+    assert "ONE finding together" in MESSAGE and "first-visit:" in MESSAGE and "joined with `+`" in MESSAGE
