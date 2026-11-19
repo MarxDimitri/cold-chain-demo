@@ -20,11 +20,17 @@ BASE_CSS = """
 
 LIGHT, DARK, STRIPE_DARK = "#FEC514", "#2c2f38", "#69707D"  # yellow is the light, black is the dark
 
-# Act 0 has five states of three switches (security realm, observability realm, the light). The light implies the other two.
-ACT0_IDS = {(0, 0, 0): "coldchain-act0-sources", (1, 0, 0): "coldchain-act0-security", (0, 1, 0): "coldchain-act0-observability",
-            (1, 1, 0): "coldchain-act0-both", (1, 1, 1): "coldchain-act0-lit"}
-DARK_PAGE = ACT0_IDS[(0, 0, 0)]
-LIT_PAGE = ACT0_IDS[(1, 1, 1)]
+# Act 0: four switches (security realm, observability realm, knowledge base realm, the light). The light implies the other three, so
+# there are nine states: eight combinations of the realms with the light off, and one with the light on.
+def _act0_id(sec: int, obs: int, kb: int) -> str:
+    names = [n for n, on in (("security", sec), ("observability", obs), ("knowledge", kb)) if on]
+    return "coldchain-act0-" + ("-".join(names) if names else "sources")
+
+
+ACT0_IDS = {(s_, o_, k_, 0): _act0_id(s_, o_, k_) for s_ in (0, 1) for o_ in (0, 1) for k_ in (0, 1)}
+ACT0_IDS[(1, 1, 1, 1)] = "coldchain-act0-lit"
+DARK_PAGE = ACT0_IDS[(0, 0, 0, 0)]
+LIT_PAGE = ACT0_IDS[(1, 1, 1, 1)]
 
 _OBS_ICONS = """<g fill="none" stroke="@@SHAPE@@" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
     <g transform="translate(30,80)"><rect x="2" y="8" width="42" height="40" rx="3"/><line x1="2" y1="22" x2="44" y2="22"/><line x1="2" y1="35" x2="44" y2="35"/><path d="M23 0v6M19 3l4 3 4-3"/></g>
@@ -49,9 +55,9 @@ _CROWNS = """<g fill="#FFF3C4" stroke="#8A6A00" stroke-width="2" stroke-linejoin
   </g>"""
 
 
-def _lamp_svg(sec: int, obs: int, light: int) -> str:
+def _lamp_svg(sec: int, obs: int, kb: int, light: int) -> str:
     """The streetlight. Only the realms that are switched on are drawn; the light switches on everything and lights it yellow."""
-    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(light)
+    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(kb or light)
     zone = (lambda x: f'<rect x="{x}" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>') if light else \
            (lambda x: f'<rect x="{x}" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>')
     sides = (zone(0) if show_obs else "") + (zone(670) if show_kb else "")
@@ -68,9 +74,9 @@ def _lamp_svg(sec: int, obs: int, light: int) -> str:
                 f'<text x="{cx}" y="41" text-anchor="middle" font-size="11" fill="{u}">{sub}</text>')
 
     labels = ((label(165, "OBSERVABILITY REALM", "in the light" if light else "in the dark", bool(light)) if show_obs else "")
-              + (label(835, "KNOWLEDGE BASE REALM", "in the light", True) if show_kb else "")
+              + (label(835, "KNOWLEDGE BASE REALM", "in the light" if light else "in the dark", bool(light)) if show_kb else "")
               + (label(500, "SECURITY REALM", "everything in the light" if light else "crown jewels in the light", True) if show_sec else ""))
-    hint = "" if (show_sec or show_obs) else '<text x="500" y="140" text-anchor="middle" font-size="16" fill="currentColor" opacity=".55">Everything is dark. Switch on a realm, or the light.</text>'
+    hint = "" if (show_sec or show_obs or show_kb) else '<text x="500" y="140" text-anchor="middle" font-size="16" fill="currentColor" opacity=".55">Everything is dark. Switch on a realm, or the light.</text>'
     return f"""
 <svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over the realms that are switched on">
   <defs>
@@ -99,18 +105,26 @@ def _toggle(href: str, label: str, on: bool) -> str:
             f'<circle cx="{knob_x}" cy="12" r="9" fill="#fff"/></svg><span>{label}</span></a>')
 
 
-def _toggles(sec: int, obs: int, light: int) -> str:
-    """Three switches: the observability realm, the security realm and, last, the light. Each links to the page with that switch flipped
-    (custom panels cannot run code). Switching a realm off while the light is on leaves the other realm on."""
-    if light:
-        t_obs, t_sec, t_light = (1, 0, 0), (0, 1, 0), (1, 1, 0)
-    else:
-        t_obs, t_sec, t_light = (sec, 1 - obs, 0), (1 - sec, obs, 0), (1, 1, 1)
-    obs_on, sec_on = bool(obs or light), bool(sec or light)
+def _toggles(sec: int, obs: int, kb: int, light: int) -> str:
+    """Four switches: the observability, security and knowledge base realms and, last, the light. Each links to the page with that switch
+    flipped (custom panels cannot run code). Switching a realm off while the light is on keeps the other realms on."""
+    def flip(which: int) -> tuple:
+        if light:
+            st = [1, 1, 1]
+            st[which] = 0
+            return (*st, 0)
+        st = [sec, obs, kb]
+        st[which] = 1 - st[which]
+        return (*st, 0)
+
+    t_light = (1, 1, 1, 0) if light else (1, 1, 1, 1)
+    on = (bool(sec or light), bool(obs or light), bool(kb or light))
+    word = lambda is_on: "off" if is_on else "on"
     return ('<div class="cc-switchbar">'
-            + _toggle(ACT0_IDS[t_obs], f"Switch {'off' if obs_on else 'on'} Observability realm", obs_on)
-            + _toggle(ACT0_IDS[t_sec], f"Switch {'off' if sec_on else 'on'} Security realm", sec_on)
-            + _toggle(ACT0_IDS[t_light], f"Switch {'off' if light else 'on'} the light", bool(light)) + '</div>')
+            + _toggle(ACT0_IDS[flip(1)], f"Switch {word(on[1])} Observability realm", on[1])
+            + _toggle(ACT0_IDS[flip(0)], f"Switch {word(on[0])} Security realm", on[0])
+            + _toggle(ACT0_IDS[flip(2)], f"Switch {word(on[2])} Knowledge base realm", on[2])
+            + _toggle(ACT0_IDS[t_light], f"Switch {word(bool(light))} the light", bool(light)) + '</div>')
 
 
 _CARD_DARK = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}">
@@ -135,9 +149,9 @@ _TILES = """<div class="card lit"><span class="zone">under the light</span><b>En
 """
 
 
-def realms(sec: int = 0, obs: int = 0, light: int = 0) -> str:
+def realms(sec: int = 0, obs: int = 0, kb: int = 0, light: int = 0) -> str:
     """Act 0 template for one state of the switches. Query: the live source counts (tier, zone, label, what, rows_txt)."""
-    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(light)
+    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(kb or light)
     card = _CARD_LIT if light else _CARD_DARK
     css = """
 <style>
@@ -163,13 +177,13 @@ def realms(sec: int = 0, obs: int = 0, light: int = 0) -> str:
     obs_col = tier("Observability realm") if show_obs else ""
     sec_col = (_TILES + tier("Security realm")) if show_sec else ""
     kb_col = tier("Knowledge base realm") if show_kb else ""
-    return (BASE_CSS + css + '<div class="cc">' + _toggles(sec, obs, light) + _lamp_svg(sec, obs, light) + '\n<div class="cc-cols">\n'
+    return (BASE_CSS + css + '<div class="cc">' + _toggles(sec, obs, kb, light) + _lamp_svg(sec, obs, kb, light) + '\n<div class="cc-cols">\n'
             '<div class="cc-col"><div class="cc-cards">\n' + obs_col + '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + sec_col +
             '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + kb_col + '\n</div></div>\n</div></div>\n')
 
 
-REALMS = realms(0, 0, 0)
-REALMS_LIT = realms(1, 1, 1)
+REALMS = realms(0, 0, 0, 0)
+REALMS_LIT = realms(1, 1, 1, 1)
 
 # Act 2: one tile per store. Query: per store, the cabinets whose setpoint was raised, and the warm ones now.
 # Act 2: four estate tiles with a coloured stripe, like Act 1. Query rows: ord, label, value, normal, delta, state (green, amber, red).

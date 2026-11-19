@@ -194,9 +194,9 @@ def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10,
 
 # --- Act 0: the realms you usually do not watch ------------------------------------------------------------------------
 
-def act0(state: tuple[int, int, int] = (0, 0, 0)) -> Dash:
-    """Act 0 for one state of the three switches (security realm, observability realm, the light). The default shows nothing but the lamp."""
-    light = state[2]
+def act0(state: tuple[int, int, int, int] = (0, 0, 0, 0)) -> Dash:
+    """Act 0 for one state of the four switches (security, observability, knowledge base, the light). The default shows nothing but the lamp."""
+    light = state[3]
     d = Dash(panels.ACT0_IDS[state],
              "Act 0: The light is on - one platform, every realm" if light else "Act 0: The streetlight effect - we search where the light is",
              "The sources the demo reads, counted live from their indices. Synthetic data.", time=("now-24h", "now"))
@@ -206,7 +206,7 @@ def act0(state: tuple[int, int, int] = (0, 0, 0)) -> Dash:
 
 
 def act0_lit() -> Dash:
-    return act0((1, 1, 1))
+    return act0((1, 1, 1, 1))
 
 
 # --- Act 1: the estate -------------------------------------------------------------------------------------------
