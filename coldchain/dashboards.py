@@ -481,33 +481,75 @@ EVIDENCE = """FROM logs-network_traffic.tls-pos
 | LIMIT 3"""
 
 
+def pos_map_query() -> str:
+    """One row per store: the back-office POS PC's data received over the scenario's three weeks and its calls to the system manager."""
+    s = "logs-netflow.summary-pos"
+    return (f'FROM {s} | WHERE {ET} AND retail.device.role == "pos-backoffice" '
+            '| STATS recv_mb = TO_LONG(ROUND(SUM(destination.bytes) / 1000000.0, 0)), '
+            'reached = COUNT(*) WHERE destination.port == 80 AND CIDR_MATCH(destination.ip, "10.0.0.0/8"), '
+            'first_reach = MIN(@timestamp) WHERE destination.port == 80 AND CIDR_MATCH(destination.ip, "10.0.0.0/8") BY store = retail.store.id '
+            '| EVAL status = CASE(reached > 0, "pivot", "normal"), recv_txt = ' + THOUSANDS.format(col="recv_mb") +
+            ', first_reach_txt = DATE_FORMAT("yyyy-MM-dd", first_reach), ' + geo_cases() + " | SORT store")
+
+
+def pos_cards_query() -> str:
+    """Four cards: what the S07 back-office POS did against what its 19 peers do (rows label, value_txt, note, state)."""
+    s = "logs-netflow.summary-pos"
+    peers_in = (f'(FROM {s} | WHERE {ET} AND retail.device.role == "pos-backoffice" '
+                '| STATS mine = SUM(destination.bytes) WHERE host.name == "S07-POS-BO-01", total = SUM(destination.bytes), n = COUNT_DISTINCT(host.name) '
+                '| EVAL peer = (total - mine) / (n - 1), ord = 1, label = "Received, three weeks", '
+                'value_txt = CONCAT(TO_STRING(ROUND(mine / 1000000000.0, 1)), " GB"), '
+                'note = CONCAT("Peers: ", TO_STRING(TO_LONG(ROUND(peer / 1000000.0, 0))), " MB each. Mostly from sync.example-cdn.net, not in its profile"), state = "red" '
+                "| KEEP ord, label, value_txt, note, state)")
+    cpu = ('(FROM logs-pos.terminal-pos | WHERE @timestamp >= "2026-11-08T00:00:00Z" AND @timestamp < "2026-11-12T00:00:00Z" AND retail.device.role == "pos-backoffice" '
+           '| STATS cpu = AVG(host.cpu.usage) * 100 WHERE host.name == "S07-POS-BO-01", peer = AVG(host.cpu.usage) * 100 WHERE host.name != "S07-POS-BO-01", '
+           'free = AVG(coldchain.pos.disk_free_pct) WHERE host.name == "S07-POS-BO-01", peer_free = AVG(coldchain.pos.disk_free_pct) WHERE host.name != "S07-POS-BO-01" '
+           '| EVAL ord = 2, label = "CPU, last four days", value_txt = CONCAT(TO_STRING(TO_LONG(ROUND(cpu, 0))), " %"), '
+           'note = CONCAT("Peers: ", TO_STRING(TO_LONG(ROUND(peer, 0))), " %. Free disk ", TO_STRING(TO_LONG(ROUND(free, 0))), " % against ", TO_STRING(TO_LONG(ROUND(peer_free, 0))), " %"), state = "red" '
+           "| KEEP ord, label, value_txt, note, state)")
+    reach = (f'(FROM {s} | WHERE {ET} AND host.name == "S07-POS-BO-01" AND destination.port == 80 AND CIDR_MATCH(destination.ip, "10.7.0.0/16") '
+             "| STATS first_t = MIN(@timestamp), n = COUNT(*) "
+             '| EVAL ord = 3, label = "First call to the system manager", value_txt = DATE_FORMAT("yyyy-MM-dd", first_t), '
+             'note = CONCAT(TO_STRING(n), " flows to tcp/80 inside the store. Normal: never"), state = "red" '
+             "| KEEP ord, label, value_txt, note, state)")
+    tls = ('(FROM logs-network_traffic.tls-pos | WHERE ' + ET + ' AND tls.client.server_name == "sync.example-cdn.net" '
+           "| STATS nights = COUNT_DISTINCT(DATE_TRUNC(1 day, @timestamp)), chunks = COUNT(*) "
+           '| EVAL ord = 4, label = "Night downloads", value_txt = TO_STRING(nights), '
+           'note = CONCAT("nights, ", TO_STRING(chunks), " chunks of 20 to 60 MB with an unusual TLS fingerprint. Normal: none"), state = "red" '
+           "| KEEP ord, label, value_txt, note, state)")
+    return f"FROM {peers_in}, {cpu}, {reach}, {tls} | SORT ord"
+
+
 def pos() -> Dash:
     d = Dash("coldchain-pos-evidence", "Act 5: The POS that nobody watched",
              "Hypothetical scenario, synthetic data: a back-office POS PC downloads 4 GB at night and then reaches the refrigeration system manager.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
-    custom(d, "What the S07 back-office POS talked to that its profile does not allow", EVIDENCE, panels.POS_EVIDENCE, w=48, h=9)
+    custom(d, "Back-office POS per store", pos_map_query(), panels.pos_map(), w=20, h=28, show_title=False)
+    custom(d, "POS cards", pos_cards_query(), panels.CARD_ROWS, w=28, h=9, x=20, show_title=False)
     d.row(9)
     s = "logs-netflow.summary-pos"
-    lines(d, "Bytes received per night: the S07 back-office POS against its 19 peers (MB)",
+    lines(d, "Bytes received per night: the S07 back-office POS against its peers (MB)",
           f'FROM {s} | WHERE {ET} AND retail.device.role == "pos-backoffice" '
           "| STATS b = SUM(destination.bytes) BY day = BUCKET(@timestamp, 1 day), host.name "
           '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
-          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=24, h=12, by="who", kind="bar")
+          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=28, h=19, x=20, by="who", kind="bar")
+    d.row(19)
     lines(d, "CPU: the S07 back-office POS against its peers (%)",
           "FROM logs-pos.terminal-pos | WHERE " + ET + ' AND retail.device.role == "pos-backoffice" '
           '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
-          "| STATS cpu = ROUND(AVG(host.cpu.usage) * 100, 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["cpu"], w=24, h=12, x=24, by="who")
-    d.row(12)
+          "| STATS cpu = ROUND(AVG(host.cpu.usage) * 100, 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["cpu"], w=24, h=11, by="who")
     lines(d, "Free disk (%)", "FROM logs-pos.terminal-pos | WHERE " + ET + ' AND retail.device.role == "pos-backoffice" '
           '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
-          "| STATS free = ROUND(AVG(coldchain.pos.disk_free_pct), 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["free"], w=24, h=10, by="who")
+          "| STATS free = ROUND(AVG(coldchain.pos.disk_free_pct), 0) BY t = BUCKET(@timestamp, 6 hours), who", "t", ["free"], w=24, h=11, x=24, by="who")
+    d.row(11)
+    custom(d, "What the S07 back-office POS talked to that its profile does not allow", EVIDENCE, panels.POS_EVIDENCE, w=24, h=11, show_title=False)
     table(d, "First time inside store S07: who called whom",
           f'FROM {s} | WHERE {ET} AND retail.store.id == "S07" AND CIDR_MATCH(source.ip, "10.7.0.0/16") '
           'AND CIDR_MATCH(destination.ip, "10.7.0.0/16") AND retail.device.role == "pos-backoffice" '
           "| STATS first_seen = MIN(@timestamp), flows = COUNT(*) BY from = host.name, to = destination.ip, port = destination.port "
           "| EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd\", first_seen) | SORT first_seen DESC | LIMIT 8",
-          ["first_seen", "from", "to", "port", "flows"], w=24, h=10, x=24)
-    d.row(10)
+          ["first_seen", "from", "to", "port", "flows"], w=24, h=11, x=24)
+    d.row(11)
     return d
 
 

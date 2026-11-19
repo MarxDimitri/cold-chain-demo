@@ -388,6 +388,71 @@ HUNT_TILES = BASE_CSS + """
 """
 
 
+# Act 5: cards from rows (label, value_txt, note, state red/amber/green) and the POS map. Rows of the map: store, status (pivot or normal), recv_mb, recv_txt,
+# reached, first_reach_txt, x, y, town.
+CARD_ROWS = BASE_CSS + """
+<style>
+.cc{container-type:inline-size}
+.cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
+.cc .et.red{border-left-color:#BD271E}
+.cc .et.amber{border-left-color:#F5A700}
+.cc .et .lbl{font-size:clamp(10px,1.05cqw,13px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8}
+.cc .et .big{font-size:clamp(24px,2.8cqw,40px);font-weight:700;line-height:1.1}
+.cc .et.red .big{color:#BD271E}
+.cc .et.amber .big{color:#B77A00}
+.cc .et .norm{font-size:clamp(10px,1.05cqw,13px);opacity:.85}
+</style>
+<div class="cc"><div class="est">
+{% for row in rows %}
+<div class="et {{ row["state"].value }}"><div class="lbl">{{ row["label"].value }}</div><div class="big">{{ row["value_txt"].value }}</div>
+  <div class="norm">{{ row["note"].value }}</div></div>
+{% endfor %}
+</div></div>
+"""
+
+POS_MAP = BASE_CSS + """
+<style>
+.cc .map{max-width:540px;margin:0 auto;position:relative}
+.cc .zbar{font-size:13px;margin:0 8px 6px 8px}
+.cc .map svg{display:block}
+.cc .bub{cursor:default}
+.cc .bub:hover circle{stroke-width:4}
+@keyframes ccpulse{
+  0%{r:15;opacity:.55}
+  100%{r:34;opacity:0}
+}
+.cc .pulse{animation:ccpulse 1.8s ease-out infinite}
+</style>
+<div class="cc"><div class="zbar"><span class="muted">The back-office POS PC of every store: data received over three weeks and calls to the refrigeration system manager. Hypothetical, synthetic.</span></div><div class="map">
+<svg viewBox="@@VB@@" width="100%" role="img" aria-label="Back-office POS PCs per store">
+  @@BASE@@
+  <text x="14" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2">FRANCE</text>
+  <text x="490" y="28" font-size="13" font-weight="700" fill="currentColor" opacity=".55" letter-spacing="2" text-anchor="end">GERMANY</text>
+  <text x="14" y="590" font-size="13" font-weight="700" fill="#9170B8" letter-spacing="2" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-opacity=".7">SWITZERLAND</text>
+  {% for row in rows %}
+  <g class="bub">
+    {% if row["status"].value == "pivot" %}<circle class="pulse" cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="15" fill="#BD271E"/>{% endif %}
+    <circle cx="{{ row["x"].value }}" cy="{{ row["y"].value }}" r="{% if row["status"].value == "pivot" %}16{% else %}11{% endif %}" stroke="#fff" stroke-width="2.5"
+      fill="{% if row["status"].value == "pivot" %}#BD271E{% else %}#54B399{% endif %}">
+      <title>{{ row["store"].value }} {{ row["town"].value }}: the back-office POS received {{ row["recv_txt"].value }} MB in three weeks{% if row["status"].value == "pivot" %}, and from {{ row["first_reach_txt"].value }} it called the system manager ({{ row["reached"].value }} flows). It is not normal for a POS to reach the refrigeration controller.{% else %}, no call to the system manager.{% endif %}</title></circle>
+    <text x="{{ row["x"].value }}" y="{{ row["y"].value | plus: 3.5 }}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">{{ row["store"].value | slice: 1, 2 }}</text>
+  </g>
+  {% endfor %}
+  <rect x="8" y="@@LEGBOX@@" width="420" height="28" rx="7" fill="#1d1e24" fill-opacity=".86"/>
+  <g font-size="13" fill="#f2f4f8"><circle cx="24" cy="@@LEGY@@" r="7" fill="#54B399" stroke="#fff" stroke-width="1.5"/><text x="38" y="@@LEGY@@" dy="4.5">normal</text>
+    <circle cx="110" cy="@@LEGY@@" r="7" fill="#BD271E" stroke="#fff" stroke-width="1.5"/><text x="124" y="@@LEGY@@" dy="4.5">downloaded 4 GB, reached the controller</text></g>
+  <text x="496" y="674" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">Base map: Natural Earth (public domain).</text>
+</svg></div></div>
+"""
+
+
+def pos_map() -> str:
+    base, w, h = base_map()
+    return (POS_MAP.replace("@@BASE@@", base).replace("@@VB@@", f"0 0 {w} {h}").replace("@@LEGY@@", str(round(h - 32)))
+            .replace("@@LEGBOX@@", str(round(h - 46))))
+
+
 STORE_MAP_TPL = BASE_CSS + """
 <style>
 .cc .map{max-width:540px;margin:0 auto;position:relative}
