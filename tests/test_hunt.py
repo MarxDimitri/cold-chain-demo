@@ -12,3 +12,7 @@ def test_workflow_yaml_parses_and_wires_the_agent_to_the_index():
     write = record["steps"][0]
     assert write["with"]["index"] == INDEX and write["with"]["id"] == "{{ foreach.item.key }}"
     assert "steps.hunt.output.structured_output.findings" in record["foreach"]
+
+
+def test_visited_but_unchanged_stores_are_one_grouped_finding():
+    assert "ONE finding together" in hunt.MESSAGE and "first-visit:" in hunt.MESSAGE and "joined with `+`" in hunt.MESSAGE

@@ -39,6 +39,10 @@ Check at least these, with your tools:
 5. Logistics: frozen deliveries heading to a store whose frozen cabinets are not safe to load (ERP plan, truck telemetry and cabinet
    telemetry together).
 
+Stores that an outside address logged in to but did NOT change anything (no setpoint change, no forced defrost, in the live data
+or the history) are ONE finding together, key `first-visit:` followed by their ids joined with `+` in order, title like "Unknown address
+logged in to 6 stores, no change yet", stores listing all of them, severity high. A first visit to a store where setpoints were changed is
+its own finding, with the store id in the key (`first-visit:S07`), because that store was hit.
 Report one finding per type and store, never two for the same thing (a first visit seen both live and in the history is one
 finding, with the earliest time). The key is exactly `<type>:<store>` with the type from this list and the store id (for a
 group of stores use their ids joined with `+`, in order): first-visit, setpoint-change, forced-defrost, warm-cabinets,
