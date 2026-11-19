@@ -16,8 +16,9 @@ from .elastic import client
 
 SECURITY, OBSERVABILITY, KB = "Security realm", "Observability realm", "Knowledge base realm"
 TIER_ORDER = {SECURITY: 1, OBSERVABILITY: 2, KB: 3}
-# What a SOC already looks at: its alerts, and what the hunting agent adds. Every other source is in the dark.
-LIT = {".alerts-security.alerts-default", "cc-hunt-findings"}
+# What the SOC can see under its light: the whole Security realm. Observability and the knowledge base are in the dark until they are switched on.
+LIT = {"logs-coldchain.audit-default", "logs-netflow.summary-default", "logs-netflow.summary-pos", "logs-network_traffic.tls-pos",
+       ".alerts-security.alerts-default", "cc-hunt-findings"}
 
 # (source as written after FROM, tier, what it holds, has a time field)
 SOURCES: list[tuple[str, str, str, bool]] = [

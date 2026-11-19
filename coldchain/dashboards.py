@@ -89,7 +89,8 @@ NAV_CSS = """<style>
 def nav_panel(dash_id: str) -> dict | None:
     """A quiet strip: small previous and next links on the sides and one numbered dot per act in the middle."""
     ids = [a[0] for a in ACTS]
-    dash_id = {panels.LIT_PAGE: panels.DARK_PAGE}.get(dash_id, dash_id)  # "the light is on" is Act 0 with the light on
+    if dash_id in panels.ACT0_IDS.values():  # every state of the Act 0 switches is Act 0
+        dash_id = panels.DARK_PAGE
     if dash_id.startswith("coldchain-act1a-s07-"):  # a clicked cabinet is still Act 1
         dash_id = "coldchain-act1a-cabinet"
     if dash_id.startswith("coldchain-act1b-s"):  # a clicked store is still Act 2
@@ -193,23 +194,19 @@ def custom(d: Dash, title: str, q: str, template: str, w: int = 48, h: int = 10,
 
 # --- Act 0: the realms you usually do not watch ------------------------------------------------------------------------
 
-def act0() -> Dash:
-    d = Dash("coldchain-act0-sources", "Act 0: The streetlight effect - we search where the light is",
-             "Every source the demo reads, in one place: telemetry, audit, probes, network flows, POS terminals, the knowledge base. Synthetic data.",
-             time=("now-24h", "now"))
-    q = sources.live_query(THOUSANDS)
-    custom(d, "The realms", q, panels.REALMS, w=48, h=50, show_title=False)
+def act0(state: tuple[int, int, int] = (0, 0, 0)) -> Dash:
+    """Act 0 for one state of the three switches (security realm, observability realm, the light). The default shows nothing but the lamp."""
+    light = state[2]
+    d = Dash(panels.ACT0_IDS[state],
+             "Act 0: The light is on - one platform, every realm" if light else "Act 0: The streetlight effect - we search where the light is",
+             "The sources the demo reads, counted live from their indices. Synthetic data.", time=("now-24h", "now"))
+    custom(d, "The realms", sources.live_query(THOUSANDS), panels.realms(*state), w=48, h=50, show_title=False)
     d.row(50)
     return d
 
 
 def act0_lit() -> Dash:
-    d = Dash(panels.LIT_PAGE, "Act 0: The light is on - one platform, every realm",
-             "The same sources with the light on: nothing in the dark. Synthetic data.", time=("now-24h", "now"))
-    q = sources.live_query(THOUSANDS)
-    custom(d, "The realms, lit", q, panels.REALMS_LIT, w=48, h=50, show_title=False)
-    d.row(50)
-    return d
+    return act0((1, 1, 1))
 
 
 # --- Act 1: the estate -------------------------------------------------------------------------------------------
@@ -563,9 +560,12 @@ def hunt() -> Dash:
     return d
 
 
-# Ids are listed, not read from the builders.
-DASHBOARDS = {"coldchain-act0-sources": act0, "coldchain-act0-lit": act0_lit, "coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
-              "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos}
+# Ids are listed, not read from the builders. Act 0 comes first (the five states of its switches), then the other acts in order.
+DASHBOARDS = {}
+for _st, _id in panels.ACT0_IDS.items():
+    DASHBOARDS[_id] = (lambda st=_st: act0(st))
+DASHBOARDS.update({"coldchain-act1a-cabinet": act1a, "coldchain-act1b-estate": act1,
+                   "coldchain-act3-history": act3, "coldchain-hunt-findings": hunt, "coldchain-pos-evidence": pos})
 # one Act 2 page per store, opened by clicking its dot on the map
 for _s in STORE_GEO:
     DASHBOARDS[f"coldchain-act1b-{_s.lower()}"] = (lambda s=_s: act1(s))

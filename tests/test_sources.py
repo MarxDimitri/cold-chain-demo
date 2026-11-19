@@ -24,3 +24,8 @@ def test_act_0_counts_every_source_live_and_joins_only_the_editorial_catalog():
         assert (f"MIN(@timestamp)" in q) if timed else True
     assert "LOOKUP JOIN kb-sources ON source" in q and q.count("FROM (") == 1  # subqueries are not nested
     assert "rows" not in q.split("LOOKUP JOIN")[1].split("KEEP")[0].replace("rows_txt", "")  # no stored counts are used
+
+
+def test_the_four_security_sources_are_under_the_light():
+    for src in ("logs-coldchain.audit-default", "logs-netflow.summary-default", "logs-netflow.summary-pos", "logs-network_traffic.tls-pos"):
+        assert src in LIT

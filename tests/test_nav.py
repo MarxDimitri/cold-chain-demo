@@ -19,26 +19,34 @@ def test_every_act_has_a_quiet_strip_with_its_neighbours_and_nothing_overlaps():
         assert min(p["grid"]["y"] for p in body["panels"][1:]) >= dashboards.NAV_HEIGHT
 
 
-def test_the_light_switch_links_the_two_versions_of_act_0():
-    dark = dashboards.DASHBOARDS["coldchain-act0-sources"]().body()["panels"][1]["config"]["template"]
-    lit = dashboards.DASHBOARDS["coldchain-act0-lit"]().body()["panels"][1]["config"]["template"]
-    assert "#/view/coldchain-act0-lit" in dark and "Switch on the light" in dark
-    assert "#/view/coldchain-act0-sources" in lit and "Switch off the light" in lit
-    nav = dashboards.DASHBOARDS["coldchain-act0-lit"]().body()["panels"][0]["config"]["template"]
-    assert nav.count('class="step cur"') == 1 and "#/view/coldchain-act1a-cabinet" in nav  # the lit page is Act 0 in the strip
+def test_act_0_has_three_switches_and_five_states_that_link_to_each_other():
+    ids = dashboards.panels.ACT0_IDS
+    assert set(ids.values()) <= set(dashboards.DASHBOARDS) and len(ids) == 5
+
+    def tpl(state):
+        return dashboards.DASHBOARDS[ids[state]]().body()["panels"][1]["config"]["template"]
+
+    start = tpl((0, 0, 0))
+    assert "Switch on Observability realm" in start and "Switch on Security realm" in start and "Switch on the light" in start
+    assert start.index("Observability realm") < start.index("Security realm") < start.index("the light")  # the light is the last switch
+    assert f"#/view/{ids[(0, 1, 0)]}" in start and f"#/view/{ids[(1, 0, 0)]}" in start and f"#/view/{ids[(1, 1, 1)]}" in start
+    lit = tpl((1, 1, 1))
+    assert "Switch off the light" in lit and f"#/view/{ids[(1, 1, 0)]}" in lit  # the light off keeps both realms on
+    assert "Switch off Observability realm" in lit and f"#/view/{ids[(1, 0, 0)]}" in lit
+    assert f"#/view/{ids[(0, 1, 0)]}" in lit  # the security realm off keeps the observability realm on
+    for state in ids:
+        nav = dashboards.DASHBOARDS[ids[state]]().body()["panels"][0]["config"]["template"]
+        assert nav.count('class="step cur"') == 1 and 'class="step cur" title="Act 0' in nav
 
 
-def test_every_cabinet_links_to_its_own_dashboard_and_shows_its_own_state():
-    for k in range(1, 25):
-        cab = f"S07-C{k:02d}"
-        did = "coldchain-act1a-cabinet" if cab == "S07-C05" else f"coldchain-act1a-{cab.lower()}"
-        body = dashboards.DASHBOARDS[did]().body()
-        panels_ = body["panels"]
-        layout, tiles = panels_[1]["config"], panels_[2]["config"]
-        assert f'{{% if row["cab"].value == "{cab}" %}}#1a1c21' in layout["template"]  # the heavy outline is on this cabinet
-        assert "href=\"/app/dashboards#/view/{% if row[\"cab\"].value" in layout["template"].replace("'", "")
-        assert f'device.id == "{cab}"' in tiles["esql_query"][0]
-        assert ("0 to +5" in tiles["template"]) == (k > 16)  # chilled cabinets have their own normal range
-        assert "@@" not in layout["template"] and "@@" not in tiles["template"]
-        nav = panels_[0]["config"]["template"]
-        assert nav.count('class="step cur"') == 1 and 'class="step cur" title="Act 1' in nav  # still Act 1 in the strip
+def test_what_each_state_of_act_0_shows():
+    ids = dashboards.panels.ACT0_IDS
+
+    def tpl(state):
+        return dashboards.DASHBOARDS[ids[state]]().body()["panels"][1]["config"]["template"]
+
+    assert "Everything is dark" in tpl((0, 0, 0)) and "SECURITY REALM" not in tpl((0, 0, 0)) and "OBSERVABILITY REALM" not in tpl((0, 0, 0))
+    assert "SECURITY REALM" in tpl((1, 0, 0)) and "OBSERVABILITY REALM" not in tpl((1, 0, 0)) and "KNOWLEDGE BASE REALM" not in tpl((1, 0, 0))
+    assert "OBSERVABILITY REALM" in tpl((0, 1, 0)) and "SECURITY REALM" not in tpl((0, 1, 0))
+    assert "KNOWLEDGE BASE REALM" not in tpl((1, 1, 0))  # the knowledge base only appears with the light
+    assert "KNOWLEDGE BASE REALM" in tpl((1, 1, 1)) and "OBSERVABILITY REALM" in tpl((1, 1, 1))

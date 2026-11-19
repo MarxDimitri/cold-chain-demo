@@ -20,60 +20,21 @@ BASE_CSS = """
 
 LIGHT, DARK, STRIPE_DARK = "#FEC514", "#2c2f38", "#69707D"  # yellow is the light, black is the dark
 
-LIT_PAGE = "coldchain-act0-lit"
-DARK_PAGE = "coldchain-act0-sources"
+# Act 0 has five states of three switches (security realm, observability realm, the light). The light implies the other two.
+ACT0_IDS = {(0, 0, 0): "coldchain-act0-sources", (1, 0, 0): "coldchain-act0-security", (0, 1, 0): "coldchain-act0-observability",
+            (1, 1, 0): "coldchain-act0-both", (1, 1, 1): "coldchain-act0-lit"}
+DARK_PAGE = ACT0_IDS[(0, 0, 0)]
+LIT_PAGE = ACT0_IDS[(1, 1, 1)]
 
-
-def _lamp_svg(lit: bool) -> str:
-    """The streetlight over three realms. Dark: the beam lights the centre, the sides are black. Lit: the beam reaches everything."""
-    side_fill = '<rect x="0" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>' \
-                '<rect x="670" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>' if lit else \
-                '<rect x="0" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>' \
-                '<rect x="670" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>'
-    beam = '<polygon points="488,82 512,82 1000,190 0,190" fill="url(#beam)"/>' if lit else \
-           '<polygon points="488,82 512,82 664,190 336,190" fill="url(#beam)"/>'
-    ink, shape = ("currentColor", "#69707D") if lit else ("#c3c8d4", "#8C97A8")
-    cap = ("in the light", "everything in the light", "in the light") if lit else \
-          ("in the dark", "crown jewels in the light", "in the dark")
-    def label(cx: float, title: str, sub: str, pill: bool, anchor: str = "middle") -> str:
-        """A realm label at the top of its zone. A yellow pill (dark text) reads on any theme; on dark grey the text is light."""
-        x = cx - 100 if anchor == "middle" else cx
-        tx = cx if anchor == "middle" else cx + 10
-        box = f'<rect x="{x}" y="8" width="200" height="40" rx="8" fill="#FEC514"/>' if pill else ""
-        t, u = ("#1d1e24", "#3b3d46") if pill else ("#f2f4f8", "#c3c8d4")
-        return (f'{box}<text x="{tx}" y="26" text-anchor="{anchor}" font-size="13" font-weight="700" fill="{t}">{title}</text>'
-                f'<text x="{tx}" y="41" text-anchor="{anchor}" font-size="11" fill="{u}">{sub}</text>')
-
-    labels = (label(165, "OBSERVABILITY REALM", cap[0], lit) + label(835, "KNOWLEDGE BASE REALM", cap[2], lit)
-              + label(500, "SECURITY REALM", cap[1], True))
-    return f"""
-<svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over three realms">
-  <defs>
-    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
-    </linearGradient>
-  </defs>
-  {side_fill}
-  <rect x="330" y="0" width="340" height="190" fill="#FEC514" fill-opacity=".10"/>
-  {beam}
-  <rect x="496" y="86" width="8" height="104" rx="3" fill="#69707D"/>
-  <g fill="#FFF3C4" stroke="#8A6A00" stroke-width="2" stroke-linejoin="round">
-    <g transform="translate(446,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
-    <g transform="translate(518,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
-  </g>
-
-  <path d="M496 92 Q496 66 536 64" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
-  <rect x="518" y="54" width="44" height="16" rx="6" fill="#343741"/>
-  <ellipse cx="540" cy="74" rx="15" ry="5" fill="#FFE9A8"/>
-  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
+_OBS_ICONS = """<g fill="none" stroke="@@SHAPE@@" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
     <g transform="translate(30,80)"><rect x="2" y="8" width="42" height="40" rx="3"/><line x1="2" y1="22" x2="44" y2="22"/><line x1="2" y1="35" x2="44" y2="35"/><path d="M23 0v6M19 3l4 3 4-3"/></g>
     <g transform="translate(88,80)"><rect x="2" y="4" width="38" height="26" rx="3"/><path d="M21 30v8M10 46h22M14 38h14v8"/><line x1="8" y1="12" x2="34" y2="12"/><line x1="8" y1="19" x2="24" y2="19"/></g>
     <g transform="translate(142,78)"><rect x="6" y="2" width="30" height="52" rx="4"/><line x1="6" y1="22" x2="36" y2="22"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="12" y1="28" x2="12" y2="38"/></g>
     <g transform="translate(196,78)"><rect x="16" y="2" width="10" height="34" rx="5"/><circle cx="21" cy="44" r="9"/><line x1="21" y1="12" x2="21" y2="44"/></g>
     <g transform="translate(244,82)"><rect x="2" y="4" width="46" height="38" rx="3"/><circle cx="12" cy="14" r="2.5"/><circle cx="22" cy="14" r="2.5"/><circle cx="32" cy="14" r="2.5"/><rect x="9" y="24" width="32" height="10" rx="2"/><path d="M10 42v6M20 42v6M30 42v6M40 42v6"/></g>
   </g>
-  <text x="34" y="184" font-size="11" fill="{ink}" opacity=".85">display case · POS · fridge · probe · OT controller</text>
-  <g fill="none" stroke="{shape}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
+  <text x="34" y="184" font-size="11" fill="@@INK@@" opacity=".85">display case · POS · fridge · probe · OT controller</text>"""
+_KB_ICONS = """<g fill="none" stroke="@@SHAPE@@" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" transform="translate(0,40)">
     <g transform="translate(700,82)"><path d="M3 14l18-9 18 9v22l-18 9-18-9z"/><path d="M3 14l18 9 18-9M21 23v22"/></g>
     <g transform="translate(748,82)"><path d="M4 38a20 20 0 1 1 34 0"/><line x1="21" y1="36" x2="30" y2="18"/><circle cx="21" cy="36" r="2.5"/><line x1="4" y1="44" x2="38" y2="44"/></g>
     <g transform="translate(796,82)"><rect x="2" y="6" width="40" height="34" rx="4"/><circle cx="14" cy="19" r="5"/><path d="M6 33c1-6 11-6 16 0M28 17h10M28 25h10"/></g>
@@ -81,20 +42,75 @@ def _lamp_svg(lit: bool) -> str:
     <g transform="translate(896,82)"><rect x="2" y="10" width="40" height="28" rx="4"/><line x1="2" y1="28" x2="42" y2="28"/><circle cx="34" cy="33" r="1.8"/><line x1="9" y1="33" x2="20" y2="33"/></g>
     <g transform="translate(944,80)"><ellipse cx="22" cy="10" rx="16" ry="6"/><path d="M6 10v28c0 3 7 6 16 6s16-3 16-6V10M6 24c0 3 7 6 16 6s16-3 16-6"/></g>
   </g>
-  <text x="720" y="184" font-size="11" fill="{ink}" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>
+  <text x="720" y="184" font-size="11" fill="@@INK@@" opacity=".85">inventory · limits · profiles · manuals · drives · ERP</text>"""
+_CROWNS = """<g fill="#FFF3C4" stroke="#8A6A00" stroke-width="2" stroke-linejoin="round">
+    <g transform="translate(446,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+    <g transform="translate(518,122)"><path d="M0 26L3 6l9 9 8-13 8 13 9-9 3 20z"/><line x1="0" y1="26" x2="40" y2="26"/><circle cx="3" cy="5" r="2.2"/><circle cx="20" cy="1.5" r="2.2"/><circle cx="37" cy="5" r="2.2"/></g>
+  </g>"""
+
+
+def _lamp_svg(sec: int, obs: int, light: int) -> str:
+    """The streetlight. Only the realms that are switched on are drawn; the light switches on everything and lights it yellow."""
+    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(light)
+    zone = (lambda x: f'<rect x="{x}" y="0" width="330" height="190" rx="8" fill="#FEC514" fill-opacity=".13"/>') if light else \
+           (lambda x: f'<rect x="{x}" y="0" width="330" height="190" rx="8" fill="#2c2f38"/>')
+    sides = (zone(0) if show_obs else "") + (zone(670) if show_kb else "")
+    centre = '<rect x="330" y="0" width="340" height="190" fill="#FEC514" fill-opacity=".10"/>' if show_sec else ""
+    beam = ('<polygon points="488,82 512,82 1000,190 0,190" fill="url(#beam)"/>' if light else
+            '<polygon points="488,82 512,82 664,190 336,190" fill="url(#beam)"/>' if sec else "")
+    ink, shape = ("currentColor", "#69707D") if light else ("#c3c8d4", "#8C97A8")
+    bulb = "#FFE9A8" if show_sec else "#8B919C"
+
+    def label(cx: float, title: str, sub: str, pill: bool) -> str:
+        t, u = ("#1d1e24", "#3b3d46") if pill else ("#f2f4f8", "#c3c8d4")
+        box = f'<rect x="{cx - 100}" y="8" width="200" height="40" rx="8" fill="#FEC514"/>' if pill else ""
+        return (f'{box}<text x="{cx}" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="{t}">{title}</text>'
+                f'<text x="{cx}" y="41" text-anchor="middle" font-size="11" fill="{u}">{sub}</text>')
+
+    labels = ((label(165, "OBSERVABILITY REALM", "in the light" if light else "in the dark", bool(light)) if show_obs else "")
+              + (label(835, "KNOWLEDGE BASE REALM", "in the light", True) if show_kb else "")
+              + (label(500, "SECURITY REALM", "everything in the light" if light else "crown jewels in the light", True) if show_sec else ""))
+    hint = "" if (show_sec or show_obs) else '<text x="500" y="140" text-anchor="middle" font-size="16" fill="currentColor" opacity=".55">Everything is dark. Switch on a realm, or the light.</text>'
+    return f"""
+<svg viewBox="0 0 1000 196" width="100%" role="img" aria-label="A streetlight over the realms that are switched on">
+  <defs>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FEC514" stop-opacity=".9"/><stop offset="1" stop-color="#FEC514" stop-opacity=".15"/>
+    </linearGradient>
+  </defs>
+  {sides}{centre}{beam}
+  <rect x="496" y="86" width="8" height="104" rx="3" fill="#69707D"/>
+  {_CROWNS if show_sec else ""}
+  <path d="M496 92 Q496 66 536 64" stroke="#69707D" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <rect x="518" y="54" width="44" height="16" rx="6" fill="#343741"/>
+  <ellipse cx="540" cy="74" rx="15" ry="5" fill="{bulb}"/>
+  {_OBS_ICONS.replace("@@SHAPE@@", shape).replace("@@INK@@", ink) if show_obs else ""}
+  {_KB_ICONS.replace("@@SHAPE@@", shape).replace("@@INK@@", ink) if show_kb else ""}
+  {hint}
 {labels}
 </svg>
 """
 
 
-def _switch(lit: bool) -> str:
-    """A light switch drawn as a toggle; it links to the other version of the page (links to dashboards work in custom panels)."""
-    target = DARK_PAGE if lit else LIT_PAGE
-    label = "Switch off the light" if lit else "Switch on the light"
-    track, knob_x = ("#FEC514", 32) if lit else ("#69707D", 12)
-    return (f'<div class="cc-switchbar"><a class="cc-switch" href="/app/dashboards#/view/{target}">'
+def _toggle(href: str, label: str, on: bool) -> str:
+    track, knob_x = ("#FEC514", 32) if on else ("#69707D", 12)
+    return (f'<a class="cc-switch" href="/app/dashboards#/view/{href}">'
             f'<svg viewBox="0 0 44 24" width="44" height="24"><rect x="0" y="0" width="44" height="24" rx="12" fill="{track}"/>'
-            f'<circle cx="{knob_x}" cy="12" r="9" fill="#fff"/></svg><span>{label}</span></a></div>')
+            f'<circle cx="{knob_x}" cy="12" r="9" fill="#fff"/></svg><span>{label}</span></a>')
+
+
+def _toggles(sec: int, obs: int, light: int) -> str:
+    """Three switches: the observability realm, the security realm and, last, the light. Each links to the page with that switch flipped
+    (custom panels cannot run code). Switching a realm off while the light is on leaves the other realm on."""
+    if light:
+        t_obs, t_sec, t_light = (1, 0, 0), (0, 1, 0), (1, 1, 0)
+    else:
+        t_obs, t_sec, t_light = (sec, 1 - obs, 0), (1 - sec, obs, 0), (1, 1, 1)
+    obs_on, sec_on = bool(obs or light), bool(sec or light)
+    return ('<div class="cc-switchbar">'
+            + _toggle(ACT0_IDS[t_obs], f"Switch {'off' if obs_on else 'on'} Observability realm", obs_on)
+            + _toggle(ACT0_IDS[t_sec], f"Switch {'off' if sec_on else 'on'} Security realm", sec_on)
+            + _toggle(ACT0_IDS[t_light], f"Switch {'off' if light else 'on'} the light", bool(light)) + '</div>')
 
 
 _CARD_DARK = """<div class="card{% if row["zone"].value == "lit" %} lit{% else %} dark{% endif %}">
@@ -119,12 +135,13 @@ _TILES = """<div class="card lit"><span class="zone">under the light</span><b>En
 """
 
 
-def realms(lit: bool) -> str:
-    """Act 0 template. Query: kb-sources (tier, zone, label, what, rows_txt). `lit` turns the light on for every source."""
-    card = _CARD_LIT if lit else _CARD_DARK
+def realms(sec: int = 0, obs: int = 0, light: int = 0) -> str:
+    """Act 0 template for one state of the switches. Query: the live source counts (tier, zone, label, what, rows_txt)."""
+    show_sec, show_obs, show_kb = bool(sec or light), bool(obs or light), bool(light)
+    card = _CARD_LIT if light else _CARD_DARK
     css = """
 <style>
-.cc-switchbar{display:flex;justify-content:flex-end;margin:0 8px 8px 0}
+.cc-switchbar{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin:0 8px 8px 0}
 .cc-switch{display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 6px;border:1px solid rgba(128,128,128,.45);border-radius:18px;
   color:inherit;text-decoration:none;font-size:12px;opacity:.85}
 .cc-switch:hover{opacity:1;background:rgba(128,128,128,.15)}
@@ -139,18 +156,20 @@ def realms(lit: bool) -> str:
 .cc .zone{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7}
 .cc .card.dark .zone{color:#c3c8d4}
 </style>"""
-    security = ('{% for row in rows %}{% if row["tier"].value == "Security realm" %}' + card + '{% endif %}{% endfor %}') if lit else \
-               ('{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "lit" %}' + card + '{% endif %}{% endfor %}\n'
-                '{% for row in rows %}{% if row["tier"].value == "Security realm" and row["zone"].value == "dark" %}' + card + '{% endif %}{% endfor %}')
-    return (BASE_CSS + css + '<div class="cc">' + _switch(lit) + _lamp_svg(lit) + '\n<div class="cc-cols">\n'
-            '<div class="cc-col"><div class="cc-cards">\n{% for row in rows %}{% if row["tier"].value == "Observability realm" %}' + card +
-            '{% endif %}{% endfor %}\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + _TILES + security +
-            '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n{% for row in rows %}{% if row["tier"].value == "Knowledge base realm" %}' + card +
-            '{% endif %}{% endfor %}\n</div></div>\n</div></div>\n')
+
+    def tier(name: str) -> str:
+        return '{% for row in rows %}{% if row["tier"].value == "' + name + '" %}' + card + '{% endif %}{% endfor %}'
+
+    obs_col = tier("Observability realm") if show_obs else ""
+    sec_col = (_TILES + tier("Security realm")) if show_sec else ""
+    kb_col = tier("Knowledge base realm") if show_kb else ""
+    return (BASE_CSS + css + '<div class="cc">' + _toggles(sec, obs, light) + _lamp_svg(sec, obs, light) + '\n<div class="cc-cols">\n'
+            '<div class="cc-col"><div class="cc-cards">\n' + obs_col + '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + sec_col +
+            '\n</div></div>\n<div class="cc-col"><div class="cc-cards">\n' + kb_col + '\n</div></div>\n</div></div>\n')
 
 
-REALMS = realms(False)
-REALMS_LIT = realms(True)
+REALMS = realms(0, 0, 0)
+REALMS_LIT = realms(1, 1, 1)
 
 # Act 2: one tile per store. Query: per store, the cabinets whose setpoint was raised, and the warm ones now.
 # Act 2: four estate tiles with a coloured stripe, like Act 1. Query rows: ord, label, value, normal, delta, state (green, amber, red).
