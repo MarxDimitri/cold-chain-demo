@@ -19,7 +19,7 @@ not the cause. BSI knows of no attacks, and the data does not say how the attack
 | Who answers: the back-office POS PC and the store server of every store (40); the POS lanes and the system managers are appliances without an agent; S12 and S16 are offline | `coldchain/osquery.py` |
 | When: the replay answers the live query at T0 + 3 minutes; `make osquery` answers it on demand | `coldchain/replay.py` |
 | Agent tools `cc_vulnerable_assets` and `cc_osquery_coverage`; hunt finding `vulnerable-runtime:estate` | `coldchain/agent.py`, `coldchain/hunt.py` |
-| Act 5: card "Java4Shell: affected devices (BSI)" and the table of devices | `coldchain/dashboards.py` `pos()` |
+| Where it shows: the agent (Act 4: tools, finding and its answer); Act 5 has no panel for it | `coldchain/dashboards.py` `pos()` |
 
 A device is **affected** when its Java version is inside the affected range of the advisory row for its major version and its CPU has AVX-512 VBMI;
 **mitigated** when a JVM flag of the advisory (`-XX:-UseBASE64Intrinsics`, `-XX:UseAVX=2`) is on its command line. Thresholds come from `kb-advisories`, not from the query.

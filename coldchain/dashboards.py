@@ -517,15 +517,7 @@ def pos_cards_query() -> str:
            '| EVAL ord = 4, label = "Night downloads", value_txt = TO_STRING(nights), '
            'note = CONCAT("nights, ", TO_STRING(chunks), " chunks of 20 to 60 MB with an unusual TLS fingerprint. Normal: none"), state = "red" '
            "| KEEP ord, label, value_txt, note, state)")
-    from . import osquery
-    java = ("(" + osquery.vulnerable_query(keep=(
-        '| STATS affected = COUNT(*) WHERE status == "affected", mitigated = COUNT(*) WHERE status LIKE "*mitigated*", answered = COUNT(*) '
-        '| EVAL ord = 5, label = "Java4Shell: affected devices (BSI)", '
-        'value_txt = CASE(answered == 0, "no answer yet", CONCAT(TO_STRING(affected), " devices")), '
-        'note = CASE(answered == 0, "Nobody has asked the endpoints yet (Osquery live query, hypothetical)", '
-        'CONCAT(TO_STRING(mitigated), " more mitigated by a JVM flag. ", TO_STRING(answered), " of 40 answered. Exposure, not evidence: BSI knows of no attacks")), '
-        'state = "amber" | KEEP ord, label, value_txt, note, state')) + ")")
-    return f"FROM {peers_in}, {cpu}, {reach}, {tls}, {java} | SORT ord"
+    return f"FROM {peers_in}, {cpu}, {reach}, {tls} | SORT ord"
 
 
 def pos() -> Dash:
@@ -533,15 +525,15 @@ def pos() -> Dash:
              "Hypothetical scenario, synthetic data: a back-office POS PC downloads 4 GB at night and then reaches the refrigeration system manager.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
     custom(d, "Back-office POS per store", pos_map_query(), panels.pos_map(), w=20, h=28, show_title=False)
-    custom(d, "POS cards", pos_cards_query(), panels.CARD_ROWS, w=28, h=11, x=20, show_title=False)
-    d.row(11)
+    custom(d, "POS cards", pos_cards_query(), panels.CARD_ROWS, w=28, h=9, x=20, show_title=False)
+    d.row(9)
     s = "logs-netflow.summary-pos"
     lines(d, "Bytes received per night: the S07 back-office POS against its peers (MB)",
           f'FROM {s} | WHERE {ET} AND retail.device.role == "pos-backoffice" '
           "| STATS b = SUM(destination.bytes) BY day = BUCKET(@timestamp, 1 day), host.name "
           '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
-          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=28, h=17, x=20, by="who", kind="bar")
-    d.row(17)
+          "| STATS mb = ROUND(AVG(b) / 1000000.0, 1) BY day, who", "day", ["mb"], w=28, h=19, x=20, by="who", kind="bar")
+    d.row(19)
     lines(d, "CPU: the S07 back-office POS against its peers (%)",
           "FROM logs-pos.terminal-pos | WHERE " + ET + ' AND retail.device.role == "pos-backoffice" '
           '| EVAL who = CASE(host.name == "S07-POS-BO-01", "S07-POS-BO-01", "average peer") '
@@ -558,9 +550,6 @@ def pos() -> Dash:
           "| EVAL first_seen = DATE_FORMAT(\"yyyy-MM-dd\", first_seen) | SORT first_seen DESC | LIMIT 8",
           ["first_seen", "from", "to", "port", "flows"], w=24, h=11, x=24)
     d.row(11)
-    table(d, "Which devices run an OpenJDK affected by the BSI warning (answers of the Osquery live query, synthetic)",
-          osquery.vulnerable_query(), ["store", "host", "role", "java", "avx512", "status"], w=48, h=12)
-    d.row(12)
     return d
 
 
