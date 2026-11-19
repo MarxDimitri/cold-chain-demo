@@ -124,6 +124,10 @@ clean-run:
 hunt:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.hunt push && $(PY) -m coldchain.dashboards push --only coldchain-hunt-findings
 
+# The SOC asks the endpoints (Osquery live query, synthetic): one set of answers now. The replay does this itself at T0 + 3 minutes.
+osquery:
+	$(PY) -m coldchain.osquery run
+
 hunt-run:
 	set -a; . ./.env; set +a; $(PY) -m coldchain.hunt run && $(PY) -m coldchain.hunt findings
 

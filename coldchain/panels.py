@@ -394,6 +394,7 @@ CARD_ROWS = BASE_CSS + """
 <style>
 .cc{container-type:inline-size}
 .cc .est{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cc .est .et:last-child:nth-child(odd){grid-column:1/-1}
 .cc .et{border:1px solid rgba(128,128,128,.35);border-left:10px solid #54B399;border-radius:8px;padding:clamp(4px,.7cqw,10px) clamp(8px,1.3cqw,16px)}
 .cc .et.red{border-left-color:#BD271E}
 .cc .et.amber{border-left-color:#F5A700}

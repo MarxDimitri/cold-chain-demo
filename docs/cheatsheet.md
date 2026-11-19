@@ -26,7 +26,7 @@ Note the line `afterwards: make reset-demo SINCE=...` that `make demo` prints.
 | 11:30 | **5** the POS | A 4 GB night-time download from a server the POS must not reach, then the controller. Say "hypothetical". |
 | 14:30 | close | Rules detect, the agent hunts, one language everywhere. |
 
-Findings empty in Act 4? `make hunt-run` (about 20 seconds, uses the LLM).
+Findings empty in Act 4? `make hunt-run` (about 20 seconds, uses the LLM). The Osquery answers (Act 5 Java4Shell card, Act 4 agent) arrive by themselves 3 minutes after T0; `make osquery` repeats them.
 
 ## 4. After
 ```bash

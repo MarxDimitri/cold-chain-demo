@@ -14,6 +14,8 @@ Everything is synthetic and fictional. The full version (Hosted, federation, TV-
 | 11:30 (3 min) | **5. The POS that nobody watched** | `coldchain-pos-evidence` | The same page shape: a map of every store's back-office POS PC (S07 red: it reached the refrigeration controller), four cards (4.4 GB received against 137 MB for its peers, CPU, first call to the system manager on 2026-11-09, 7 night downloads), the nightly download chart, CPU and disk against peers, and the evidence tables. Hypothetical, synthetic. The store network is flat: nothing separates the POS from refrigeration. | indexed summaries and TLS |
 | 14:30 (0.5 min) | Close | | Rules detect, the agent hunts, the same language everywhere. | |
 
+**Advisory lens (Acts 4 and 5, `docs/advisory-lens.md`):** the BSI warned on 18.11 about OpenJDK "Java4Shell". The agent asks the endpoints (Osquery live query, synthetic answers at T0 + 3 minutes or `make osquery`) which devices run an affected Java: 14 affected, 2 mitigated, 36 of 40 answered. S07 and S11 have an affected device, S19 does not: an exposure, never the cause.
+
 ## How it connects
 
 - The attacker walked into S07, S11 and S19 months ago (Act 3), reached S07's network through a back-office POS (Act 5), and at T0
