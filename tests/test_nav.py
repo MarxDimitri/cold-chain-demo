@@ -27,9 +27,9 @@ def test_act_0_has_four_switches_and_nine_states_that_link_to_each_other():
         return dashboards.DASHBOARDS[ids[state]]().body()["panels"][1]["config"]["template"]
 
     start = tpl((0, 0, 0, 0))
-    labels = ["Switch on Observability realm", "Switch on Security realm", "Switch on Knowledge base realm", "Switch on the light"]
+    labels = ["Switch on Security realm", "Switch on Observability realm", "Switch on Knowledge base realm", "Switch on the light"]
     assert all(lab in start for lab in labels)
-    assert [start.index(lab) for lab in labels] == sorted(start.index(lab) for lab in labels)  # the light is the last switch
+    assert [start.index(lab) for lab in labels] == sorted(start.index(lab) for lab in labels)  # security first, the light last
     for target in ((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (1, 1, 1, 1)):
         assert f"#/view/{ids[target]}" in start
     lit = tpl((1, 1, 1, 1))

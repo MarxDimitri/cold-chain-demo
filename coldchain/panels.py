@@ -106,7 +106,7 @@ def _toggle(href: str, label: str, on: bool) -> str:
 
 
 def _toggles(sec: int, obs: int, kb: int, light: int) -> str:
-    """Four switches: the observability, security and knowledge base realms and, last, the light. Each links to the page with that switch
+    """Four switches: the security, observability and knowledge base realms and, last, the light. Each links to the page with that switch
     flipped (custom panels cannot run code). Switching a realm off while the light is on keeps the other realms on."""
     def flip(which: int) -> tuple:
         if light:
@@ -121,8 +121,8 @@ def _toggles(sec: int, obs: int, kb: int, light: int) -> str:
     on = (bool(sec or light), bool(obs or light), bool(kb or light))
     word = lambda is_on: "off" if is_on else "on"
     return ('<div class="cc-switchbar">'
-            + _toggle(ACT0_IDS[flip(1)], f"Switch {word(on[1])} Observability realm", on[1])
             + _toggle(ACT0_IDS[flip(0)], f"Switch {word(on[0])} Security realm", on[0])
+            + _toggle(ACT0_IDS[flip(1)], f"Switch {word(on[1])} Observability realm", on[1])
             + _toggle(ACT0_IDS[flip(2)], f"Switch {word(on[2])} Knowledge base realm", on[2])
             + _toggle(ACT0_IDS[t_light], f"Switch {word(bool(light))} the light", bool(light)) + '</div>')
 
