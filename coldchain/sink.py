@@ -52,7 +52,8 @@ class S3Sink:
         from botocore.config import Config
 
         self.bucket, self.region = bucket, region
-        self._config = Config(retries={"max_attempts": 10, "mode": "adaptive"})
+        self._config = Config(retries={"max_attempts": 10, "mode": "adaptive"},
+                              max_pool_connections=int(os.environ.get("COLDCHAIN_UPLOAD_THREADS", "16")) + 4)  # one connection per upload thread
         self.skipped = 0
         self.existing: set[str] = set()
         if resume:  # list what is already there with the operator's credentials (stores cannot list)
