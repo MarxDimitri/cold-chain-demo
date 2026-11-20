@@ -1,5 +1,24 @@
 # Cheat-sheet: run the demo (15 minutes)
 
+## 0. Set up from scratch (once, about 1 hour, mostly waiting)
+You need: Python 3.11+, Docker, Terraform 1.5+, AWS CLI v2, `make`; an AWS account (profile that can create an S3 bucket, an SQS queue and about 22 IAM users);
+an **Elastic Cloud Serverless Security project** with an API key, Fleet, ML, Agent Builder, Workflows and an LLM connector. All data is synthetic.
+```bash
+git clone https://github.com/<your-org>/cold-chain-demo.git && cd cold-chain-demo
+make install && make test                       # a virtualenv in .venv, then the offline tests (about 40 seconds)
+cp .env.example .env                            # set AWS_PROFILE and the three ELASTIC_CLOUD_SERVERLESS_* values (Elasticsearch URL, Kibana URL, API key)
+cp infra/terraform.tfvars.example infra/terraform.tfvars   # your resource tags (the AWS sandbox policy needs them)
+aws login                                       # or: aws sso login --profile <p>
+make setup                                      # AWS (Terraform), the Elastic side, the collector container
+make backfill                                   # a year of audit, a week of telemetry: about 30 minutes, about 15,000 S3 objects
+make backfill-pos                               # the POS scenario (hypothetical)
+make baselines epilogue                         # after the collector has drained: what is normal, the POS ML jobs
+make sources content                            # Act 0 catalog; the dashboards, rules, agent and the 30-minute hunt
+make verify                                     # every query and tool answers
+```
+`.env`, `infra/terraform.tfvars` and `store-keys.json` are git-ignored: never commit them. `make content` also starts the hunt schedule (it uses the LLM every
+30 minutes: stop it with `python -m coldchain.hunt delete`). Dry run: `make rehearse`, then clean up as in section 4. More in `README.md`.
+
 ## 1. Before (day of the demo)
 ```bash
 aws login                      # the session expires; "LoginRefreshRequired" means this
