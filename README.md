@@ -16,6 +16,80 @@ version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is pres
   `docs/logistics-story.md`), and an **advisory lens**: the agent asks the endpoints (simulated Osquery answers) which devices a new security
   advisory concerns, with prompts that name no vulnerability (`docs/advisory-lens.md`).
 
+## Architecture
+
+Data flows left to right: the synthetic stores write to S3, one collector indexes the bucket into the Serverless project, and
+everything the audience sees (rules, dashboards, the agent) reads the same indices with ES|QL.
+
+```mermaid
+flowchart LR
+    subgraph SRC["Synthetic estate (generator and replay, no real data)"]
+        direction TB
+        STORES["20 stores<br/>cabinet telemetry, audit log,<br/>flow summaries, POS devices"]
+        EXTRA["Delivery trucks<br/>(telemetry + ERP plan)"]
+        OSQ["Simulated Osquery<br/>live-query answers"]
+    end
+
+    subgraph AWS["AWS, central IT (Terraform)"]
+        direction TB
+        S3[("S3 bucket<br/>versioned, Object Lock<br/>per-store write-only keys")]
+        SQS["SQS queue<br/>+ dead-letter queue"]
+        S3 -- "object created" --> SQS
+    end
+
+    COL["Collector<br/>Elastic Agent in Docker<br/>(AWS S3 input, SQS mode)<br/>enrolled in Fleet"]
+
+    subgraph ELASTIC["Elastic Cloud Serverless, Security project"]
+        direction TB
+        ING["Ingest<br/>reroute pipeline by event.dataset"]
+        IDX[("Data streams<br/>audit, telemetry, flows,<br/>probes, trucks, POS")]
+        KB[("Knowledge base<br/>lookup indices: assets, limits,<br/>thresholds, advisories, ERP plan")]
+        DET["Detection<br/>ES|QL rules 1 and 2,<br/>ML jobs, new-terms rule"]
+        ALERTS[("Security alerts")]
+        AGENT["Agent Builder agent<br/>13 ES|QL tools"]
+        WF["Workflow<br/>scheduled hunt, every 30 min"]
+        FIND[("cc-hunt-findings")]
+        DASH["Kibana dashboards<br/>Acts 0 to 5, custom panels<br/>and native charts"]
+        ING --> IDX
+        IDX --> DET --> ALERTS
+        IDX --> AGENT
+        KB --> AGENT
+        KB --> DET
+        WF -- "asks" --> AGENT
+        AGENT -- "findings, proposed actions" --> FIND
+        WF --> FIND
+    end
+
+    STORES -- "gzip NDJSON, 1-minute files" --> S3
+    EXTRA --> S3
+    SQS -- "new-object messages" --> COL
+    COL -- "bulk index" --> ING
+    OSQ -- "direct bulk" --> IDX
+
+    IDX -- "ES|QL" --> DASH
+    ALERTS --> DASH
+    FIND --> DASH
+    KB --> DASH
+
+    AUD(["Audience / presenter"])
+    DASH --> AUD
+    AGENT -. "proposes containment,<br/>never runs it" .-> AUD
+    AUD -. "make restore" .-> STORES
+```
+
+| Stage | Component | Code |
+|---|---|---|
+| Generate | The chain, telemetry, audit history, flows, POS scenario, trucks and the live attack replay | `coldchain/chain`, `telemetry`, `audit`, `network`, `scenario_b`, `trucks`, `replay`, `backfill` |
+| Land | Per-store write-only keys put files in S3; each new object notifies SQS | `infra/` (Terraform), `coldchain/sink.py` |
+| Collect | One Elastic Agent container reads the queue and indexes into the project | `compose/collector/`, `coldchain/fleet.py` |
+| Index and enrich | Data streams, the `reroute` pipeline, lookup indices for the knowledge base | `coldchain/elastic.py`, `lookup.py`, `sources.py`, `baselines.py` |
+| Detect | Threshold rules read from the knowledge base, ML jobs and a new-terms rule for the POS scenario | `coldchain/rules.py`, `epilogue.py` |
+| Hunt | An agent with ES|QL tools, run on a schedule by a Workflow, records findings (both Preview) | `coldchain/agent.py`, `hunt.py` |
+| Show | Six dashboards (about 57 pages) of custom panels and native charts | `coldchain/dashboards.py`, `panels.py`, `geo.py` |
+
+The bucket is the only way in for store data: nothing runs in a store, and no store can read, list or delete. Two sources skip the
+queue: the simulated Osquery answers are indexed directly by `coldchain/osquery.py`, and the ERP plan is loaded by the replay.
+
 ## The story in 15 minutes
 
 | Time | Dashboard (Kibana) | What the audience sees |
