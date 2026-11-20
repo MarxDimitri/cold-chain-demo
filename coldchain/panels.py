@@ -382,7 +382,7 @@ HUNT_TILES = BASE_CSS + """
 <div class="et"><div class="lbl">Tools the agent used</div><div class="big">{{ row["tools"].value | default: 0 }}</div>
   <div class="norm">of {{ row["tools_total"].value }}: audit, network, cabinets, trucks, ERP, POS</div></div>
 <div class="et{% if row["last_min"].value > 35 %} amber{% endif %}"><div class="lbl">Last hunt</div><div class="big">{{ row["last_min"].value | default: 0 }} min</div>
-  <div class="norm">ago. Every 30 minutes; it proposes and runs nothing</div></div>
+  <div class="norm">ago, every 30 minutes</div></div>
 </div></div>
 {% endfor %}
 """
