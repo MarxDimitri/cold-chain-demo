@@ -64,12 +64,12 @@ class Dash:
 
 
 # The acts in story order: dashboard id, label, a few words. The navigation strip links to the previous and the next one.
-ACTS = [("coldchain-act0-sources", "Act 0", "The realms you usually do not watch"),
-        ("coldchain-act1a-cabinet", "Act 1", "Store 07 from above"),
-        ("coldchain-act1b-estate", "Act 2", "The whole estate"),
+ACTS = [("coldchain-act0-sources", "Act 0", "Turning the light on"),
+        ("coldchain-act1a-cabinet", "Act 1", "The blip in the Colmar store"),
+        ("coldchain-act1b-estate", "Act 2", "Same blip across the estate"),
         ("coldchain-act3-history", "Act 3", "The history nobody looked at"),
-        ("coldchain-hunt-findings", "Act 4", "Hunting agent"),
-        ("coldchain-pos-evidence", "Act 5", "The POS lead")]
+        ("coldchain-hunt-findings", "Act 4", "Let the agent hunt"),
+        ("coldchain-pos-evidence", "Act 5", "The POS and the PhD")]
 NAV_HEIGHT = 2
 
 NAV_CSS = """<style>
@@ -198,7 +198,7 @@ def act0(state: tuple[int, int, int, int] = (0, 0, 0, 0)) -> Dash:
     """Act 0 for one state of the four switches (security, observability, knowledge base, the light). The default shows nothing but the lamp."""
     light = state[3]
     d = Dash(panels.ACT0_IDS[state],
-             "Act 0: The light is on - one platform, every realm" if light else "Act 0: The streetlight effect - we search where the light is",
+             "Act 0 \u00b7 Turning the light on across all realms",
              "The sources the demo reads, counted live from their indices. Synthetic data.", time=("now-24h", "now"))
     custom(d, "The realms", sources.live_query(THOUSANDS), panels.realms(*state), w=48, h=50, show_title=False)
     d.row(50)
@@ -249,7 +249,7 @@ def act1a(cabinet: str = CONTRACTOR_CABINET) -> Dash:
     cab = f'device.id == "{cabinet}"'
     default = cabinet == CONTRACTOR_CABINET
     d = Dash("coldchain-act1a-cabinet" if default else f"coldchain-act1a-{cabinet.lower()}",
-             "Act 1: Store 07, Colmar, from above - what each system says" + ("" if default else f" (cabinet {cabinet[-2:]})"),
+             "Act 1 \u00b7 The blip in the Colmar store" + ("" if default else f" (cabinet {cabinet[-2:]})"),
              "Synthetic data. Only this cabinet: no other cabinet, no store comparison, no alerts.")
     custom(d, "Store 07 from above", STORE_QUERY, panels.store_layout(cabinet), w=32, h=22, show_title=False)
     tiles_q = (f"FROM (FROM metrics-coldchain.case-* | WHERE {cab} AND {T} AND @timestamp <= NOW() | SORT @timestamp DESC | LIMIT 1 "
@@ -358,7 +358,7 @@ def act1(store: str | None = None) -> Dash:
     """Act 2. With STORE the whole page is filtered to that store (a dot of the map links to it); without, the estate."""
     town = STORE_GEO[store][2] if store else ""
     d = Dash("coldchain-act1b-estate" if not store else f"coldchain-act1b-{store.lower()}",
-             "Act 2: The same blip across the whole estate, not on SOC's radar" + (f" ({store} {town})" if store else ""),
+             "Act 2 \u00b7 Same blip across the entire estate" + (f" ({store} {town})" if store else ""),
              "Synthetic data, fictional chain: 20 stores, 480 cabinets. Central IT's view.")
     sf = f' AND retail.store.id == "{store}"' if store else ""
     # Left: the schematic map of the stores. Right: the four tiles, then the chart.
@@ -445,7 +445,7 @@ def history_tiles_query() -> str:
 
 
 def act3() -> Dash:
-    d = Dash("coldchain-act3-history", "Act 3: The history nobody looked at",
+    d = Dash("coldchain-act3-history", "Act 3 \u00b7 The history nobody looked at",
              "Which stores an unknown address logged in to as admin in the last 12 months, and which of them the warming attack has hit. Synthetic data.",
              time=("now-1y", "now"))
     custom(d, "Stores visited by an unknown address", history_map_query(), panels.history_map(), w=20, h=28, show_title=False)
@@ -521,7 +521,7 @@ def pos_cards_query() -> str:
 
 
 def pos() -> Dash:
-    d = Dash("coldchain-pos-evidence", "Act 5: The POS that nobody watched",
+    d = Dash("coldchain-pos-evidence", "Act 5 \u00b7 The POS is now having a PhD and nobody watched it",
              "Hypothetical scenario, synthetic data: a back-office POS PC downloads 4 GB at night and then reaches the refrigeration system manager.",
              time=("2026-10-22T00:00:00.000Z", "2026-11-11T23:59:59.000Z"))
     custom(d, "Back-office POS per store", pos_map_query(), panels.pos_map(), w=20, h=28, show_title=False)
@@ -572,7 +572,7 @@ def hunt_tiles_query() -> str:
 
 
 def hunt() -> Dash:
-    d = Dash("coldchain-hunt-findings", "Act 4: Hunting agent - the agent that keeps looking",
+    d = Dash("coldchain-hunt-findings", "Act 4 \u00b7 Let the agent hunt",
              "Findings of the scheduled hunt by the SOC agent (an Elastic Workflow every 30 minutes). Synthetic data.", time=("now-24h", "now"))
     custom(d, "The agent's view of the estate", hunt_map_query(), panels.hunt_map(), w=20, h=28, show_title=False)
     custom(d, "Hunt tiles", hunt_tiles_query(), panels.HUNT_TILES, w=28, h=9, x=20, show_title=False)
