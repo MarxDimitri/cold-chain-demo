@@ -112,6 +112,11 @@ queue: the simulated Osquery answers are indexed directly by `coldchain/osquery.
 **AWS:** an account and a CLI profile that can create an S3 bucket (versioning and Object Lock), an SQS queue with a dead-letter
 queue, and about 22 IAM users. The collector reads the queue; the generator and replay write with per-store keys.
 
+**Setting up the AWS bucket:** `make setup` provisions it with Terraform (`infra/`). For the sandbox rules around it (the required resource
+tags, `project`, `team`, `org`, `division`, `keep-until`, which the org policy enforces) and for AWS patterns in general, use the skills and
+pattern knowledge base in Elastic's [hive-mind](https://github.com/elastic/hive-mind) repository, for example the
+`hive-sa-cloud-tagging` skill. Set the resulting tags in `infra/terraform.tfvars`.
+
 **An Elastic Cloud Serverless Security project** (not Hosted: custom panels exist only on Serverless, Preview):
 
 | Needed | Why |
