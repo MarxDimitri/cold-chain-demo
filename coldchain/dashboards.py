@@ -577,18 +577,6 @@ def hunt() -> Dash:
     custom(d, "The agent's view of the estate", hunt_map_query(), panels.hunt_map(), w=20, h=28, show_title=False)
     custom(d, "Hunt tiles", hunt_tiles_query(), panels.HUNT_TILES, w=28, h=9, x=20, show_title=False)
     d.row(9)
-    q = ('FROM cc-hunt-findings | EVAL cat = CASE(category == "outside-access", "Outside access", category == "temperature", "Temperature", '
-         'category == "device-behaviour", "Device behaviour", category == "logistics", "Logistics", "Exposure") '
-         '| STATS critical = COUNT(*) WHERE severity == "critical", high = COUNT(*) WHERE severity == "high", '
-         'medium = COUNT(*) WHERE severity == "medium" BY cat | SORT cat')
-    cfg = {"type": "xy", "layers": [{"type": "bar_stacked", "data_source": esql(q), "x": {"column": "cat"},
-                                     "y": [{"column": "critical", "color": {"type": "static", "color": RED}},
-                                           {"column": "high", "color": {"type": "static", "color": AMBER}},
-                                           {"column": "medium", "color": {"type": "static", "color": "#6092C0"}}]}],
-           "axis": {"x": {"title": {"visible": False}}, "y": {"title": {"text": "findings", "visible": True}}},
-           "legend": {"visibility": "visible", "placement": "outside", "position": "bottom"}}
-    d.add("Findings by kind and severity", cfg, 28, 19, x=20, query=q)
-    d.row(19)
     q = ("FROM cc-hunt-findings "
          '| EVAL sev_rank = CASE(severity == "critical", 0, severity == "high", 1, severity == "medium", 2, 3), '
          'cat_rank = CASE(category == "outside-access", 0, category == "temperature", 1, category == "device-behaviour", 2, '
@@ -597,8 +585,8 @@ def hunt() -> Dash:
          'category == "device-behaviour", "Device behaviour", category == "logistics", "Logistics (trucks and the ERP)", "Exposure") '
          '| SORT cat_rank, sev_rank, @timestamp DESC | LIMIT 40 | EVAL stores_txt = MV_CONCAT(stores, ", "), tools_txt = MV_CONCAT(tools, ", ") '
          "| KEEP cat_label, severity, title, stores_txt, why_abnormal, proposed_action, tools_txt")
-    custom(d, "What the agent found", q, panels.FINDINGS, w=48, h=26, show_title=False)
-    d.row(26)
+    custom(d, "What the agent found", q, panels.FINDINGS, w=28, h=19, x=20, show_title=False)
+    d.row(19)
     return d
 
 
