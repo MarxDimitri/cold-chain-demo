@@ -198,7 +198,7 @@ def act0(state: tuple[int, int, int, int] = (0, 0, 0, 0)) -> Dash:
     """Act 0 for one state of the four switches (security, observability, knowledge base, the light). The default shows nothing but the lamp."""
     light = state[3]
     d = Dash(panels.ACT0_IDS[state],
-             "Act 0 \u00b7 Turning the light on across all realms",
+             "Act 0 \u00b7 The streetlight effect - we search where the light is",
              "The sources the demo reads, counted live from their indices. Synthetic data.", time=("now-24h", "now"))
     custom(d, "The realms", sources.live_query(THOUSANDS), panels.realms(*state), w=48, h=50, show_title=False)
     d.row(50)

@@ -17,7 +17,7 @@ version (Elastic Cloud Hosted, federation, frozen tier, TV-box epilogue) is pres
 
 | Time | Dashboard (Kibana) | What the audience sees |
 |---|---|---|
-| 0:00 | **Act 0 · Turning the light on across all realms** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
+| 0:00 | **Act 0 · The streetlight effect - we search where the light is** | A streetlight: we search where the light is. Every source the demo reads, in one place. |
 | 1:30 | **Act 1 · The blip in the Colmar store** | One cabinet: its air temperature and setpoint. One odd controller, no pattern, no alert. |
 | 3:00 | **Act 2 · Same blip across the entire estate** | A map of the 20 stores with delivery trucks moving on it: 46 setpoint changes in 3 stores, one of them from inside the store, and three frozen trucks heading for them (`docs/logistics-story.md`). |
 | 5:30 | **Act 3 · The history nobody looked at** | The same internet address logged in to S07, S11 and S19 months ago. Nothing changed, so no alert could exist. |
