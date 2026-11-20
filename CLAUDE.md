@@ -1,9 +1,44 @@
-> **BRANCH NOTE (2026-11-17): this branch is the simplified demo.** Where the brief below disagrees, `docs/plan-simplified.md` and
-> `README.md` win. Differences: **Elastic Cloud Serverless** (Security project), not Hosted; **no data federation** and no
-> frozen tier (a year of history is indexed); **POS systems** replace the TV boxes (a back-office POS PC and 4 lanes per store, the
-> `pos` namespace: `logs-netflow.summary-pos`, `logs-pos.terminal-pos`, `logs-network_traffic.tls-pos`); six dashboards built with
-> Serverless **custom panels**, no ES|QL explanations; a **15-minute** story (`docs/story-flow.md`); Act 2 adds **delivery trucks** (telemetry `logs-logistics.truck-default`, ERP plan `kb-erp-deliveries`, `docs/logistics-story.md`). The full version is the git tag
-> `v1-ech-federation-tv`. Sections 3.2, 4.4, 6.6, 8.3 to 8.5 and 12 below describe that full version.
+> **BRANCH NOTE (updated 2026-11-20): this branch (`simplified-serverless`) is the simplified demo.** Where the brief below disagrees,
+> this block, `docs/plan-simplified.md` and `README.md` win. The long brief that follows describes the **full version** (Elastic Cloud Hosted,
+> data federation, TV-box epilogue), preserved as the git tag `v1-ech-federation-tv`: sections 3.2, 4.4, 6.6, 8.3 to 8.6 and 12 do not apply here.
+
+## Current state of the simplified demo (read this first)
+
+**What it is:** Elastic Cloud **Serverless** (Security project), no federation and no frozen tier (a year of audit is indexed), **POS systems**
+instead of TV boxes, a 15-minute story of six acts (`docs/story-flow.md`, one-page runbook `docs/cheatsheet.md`). Everything is synthetic.
+Stores only write to S3 (per-store write-only keys); one collector container reads the SQS queue and indexes into the project.
+
+**The six dashboards** (built by `coldchain/dashboards.py` from `coldchain/panels.py` templates; `make dashboards` pushes about 57 pages and
+overwrites UI edits):
+| Act | Headline | Pages |
+|---|---|---|
+| 0 | The streetlight effect - we search where the light is | nine pages: four link-switches (Security, Observability, Knowledge base, the light); sizes counted live from the indices (`sources.live_query`) |
+| 1 | The blip in the Colmar store | the store layout (SVG) with state tiles; one page per S07 cabinet (click a cabinet) |
+| 2 | Same blip across the entire estate | a map of the 20 stores (Natural Earth base map as SVG), tiles, a native zoomable chart, delivery trucks; one page per store (click a dot) |
+| 3 | The history nobody looked at | map: stores an unknown address logged in to as admin (red hit, amber might be next) |
+| 4 | Let the agent hunt | map by worst finding, tiles, findings grouped by kind |
+| 5 | The POS is now having a PhD and nobody watched it | map of back-office POS PCs, cards, charts, evidence (fixed three-week window) |
+
+**Stories on top of the attack:** delivery **trucks** and an ERP plan (`coldchain/trucks.py`, `docs/logistics-story.md`); the **advisory lens**: simulated
+Osquery live-query answers checked against security advisories (`coldchain/osquery.py`, `config/advisories.yaml`, `docs/advisory-lens.md`).
+The agent (`coldchain/agent.py`, 13 ES|QL tools) and the scheduled hunt (`coldchain/hunt.py`) are Agent Builder and Workflows, both preview.
+
+**Rules for changes**
+- **Prompts name no vulnerability, product or version.** Advisories are data (`config/advisories.yaml` -> `kb-advisories`); a test enforces it. The agent
+  proposes, never runs containment; an advisory is an exposure, never the cause.
+- Fictional only, documentation IP ranges, `example` domains, never the real incident (section 2 below still holds). Label hypothetical scenarios.
+- Custom panels (Serverless Preview): HTML, CSS, Liquid, inline SVG only; no JavaScript, no external resources, links only to dashboards. State changes
+  are links between dashboards. Rendering cannot be seen through the API: ask for a screenshot. Native `vis` panels give zoom and tooltips; the
+  dashboards API accepts no annotation events and no categorical colour mapping (tried).
+- ES|QL: subqueries are not nested; `first`, `last` are reserved; a lookup index needs its fields mapped even when empty (`LOOKUP_PROPERTIES`);
+  dashboard time params are `?_tstart`, `?_tend`; panels without them ignore the picker.
+- Dashboard ids are lowercase; a push replaces the page (and any unsaved edit in the browser: leave edit mode and discard first).
+
+**Run, reset, test:** `make demo` (4 minutes before presenting), `make restore`, `make reset-demo SINCE=<printed time> DELETE=1`; `make test` (about 90 tests, offline, 40 s).
+AWS sessions expire (`aws login`); the `blake2` hashlib errors in the Python output are harmless. Browser caches old dashboards: hard reload.
+
+**Open items:** Terraform removal of the federation IAM user was written but never applied; old objects in the bucket are not emptied; rendering of newer
+panels is verified only from the user's screenshots; a full timed 15-minute run has not been done; the GitHub repository is not created yet.
 
 # Cold-chain demo: implementation brief (edge + data federation on AWS S3)
 
@@ -357,7 +392,7 @@ Test whether dashboard ES|QL panels and Discover can use datasets on the tenant.
 ### 8.6 Response and AI
 - **Workflows,** if enabled: block IPs, lock out and restore setpoints (mock service), notify, create case. The mock restore triggers `replay.py`'s restore events.
   - Fallback: a webhook connector plus a script, or a recording.
-- **Built: the agentic SOC (the ending),** `coldchain/agent.py`: an Agent Builder agent (`make agent`, `make agent-ask`) with eight ES|QL tools that tells the story in four steps and proposes containment without running it. Preview; say so.
+- **Built: the agentic SOC (the ending),** `coldchain/agent.py`: an Agent Builder agent (`make agent`, `make agent-ask`; the simplified branch has thirteen ES|QL tools and six steps, see the block at the top) that tells the story in four steps and proposes containment without running it. Preview; say so.
 - **Built: the scheduled hunt, the AlertZero pattern** (`coldchain/hunt.py`, `make hunt`, `make hunt-run`): an Elastic Workflow every 30 minutes calls `cc-soc-hunter` and records findings in `cc-hunt-findings`. AlertZero itself is not offered on 9.5.6 Cloud Hosted (no `securitySolution:enableAlertZero` setting; see `docs/decisions.md`).
 - **AlertZero "Cold-chain hunt" Watch,** if enabled, with the knowledge base and federated datasets in its context.
   - Fallback: Agent Builder with ES|QL tools (06b sections 4, 5 and 9) and a recorded video.

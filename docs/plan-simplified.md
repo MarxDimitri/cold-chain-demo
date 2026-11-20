@@ -77,3 +77,14 @@ custom panels created through the APIs, README and story flow. Backfill running 
 Not verified: how the custom panels render (the user has to look), a full 15-minute timed run.
 Not done: the Terraform removal of the federation IAM user (a change was made in `infra/main.tf` but not applied: the apply was
 blocked and needs the operator's go-ahead), emptying the old objects from the bucket.
+
+## Status (2026-11-20)
+
+Built since the first status: Act 0 with four link-switches (nine pages) and live source counts; maps on Natural Earth data for Acts 2 to 5 with
+click-through pages (one per S07 cabinet, one per store); striped tiles with their normals; delivery trucks and an ERP plan; the advisory lens
+(simulated Osquery answers, advisories as data, agent tools `cc_list_advisories` and `cc_advisory_exposure`); the hunt with grouped first visits
+and truck and advisory findings; a one-page runbook (`docs/cheatsheet.md`); new headlines for the six acts. About 90 offline tests pass.
+Verified live: the queries, the agent (scripted question in about 70 seconds), the replay with trucks and a reset. Seen by the user: the rendering,
+from screenshots, act by act.
+Still open: a full timed 15-minute run; the Terraform removal of the federation IAM user (written, never applied) and emptying the old bucket
+objects; creating the GitHub repository (`gh` is installed, login and the push are the user's steps).

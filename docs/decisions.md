@@ -534,3 +534,50 @@ The Act 2 map is a custom panel: SVG paths clipped from Natural Earth 10m (publi
 Custom panels cannot load tiles, and the dashboards API has no Maps panel, so the map has no zoom or pan. Store dots sit at the coordinates of their
 town (`STORE_GEO` in `coldchain/dashboards.py`, projection x = (lon - 6.8) * cos(48.3 deg) * 400, y = (49.15 - lat) * 400). To regenerate the paths,
 download the four files into one directory and run `python3 -I tools/build_map.py DATA_DIR OUT.json`, then write the result into `coldchain/mapdata.py`.
+
+
+## Acts 0 to 5 in one shape (2026-11-18 to 2026-11-20, simplified branch)
+
+- **Act 0:** four link-switches (Security, Observability, Knowledge base, the light, in this order) give nine pages, because a custom panel cannot hold state.
+  The light implies the three realms. With the light off only the realms switched on are drawn; the knowledge base appears only with the light. The whole
+  Security realm is "under the light" (yellow); the rest is dark grey. Sizes are counted live by one ES|QL query over the indices (0.2 s) and joined to
+  `kb-sources`, which now holds only labels, realms and zones.
+- **Maps:** the base map is real vector data (Natural Earth, public domain) clipped to the Upper Rhine and stored as SVG paths (`coldchain/mapdata.py`,
+  `tools/build_map.py`): custom panels load no tiles and the dashboards API has no Maps panel, so there is no zoom. Four stores within 5 km of Strasbourg
+  are nudged apart. A dot links to a per-store page (Act 2); a cabinet number links to a per-cabinet page (Act 1); both are plain dashboards generated from code.
+- **Act 2 chart:** a native chart (zoom by brushing) with the hottest and coolest store as lines and setpoint changes as red (raised) and blue (lowered) bars.
+  An SVG chart with hover cards was built and dropped: it could not zoom. The dashboards API rejected every annotation-event shape and categorical colour
+  mapping we tried, so the tooltip shows counts; the stores, cabinets, user and source are in the table beside it.
+- **Act 3:** shows which stores an unknown address (neither contractor nor store LAN) logged in to as admin, and which of them were hit (a setpoint raised
+  above 5 C by a non-contractor address): red hit, amber visited and not hit yet (might be next), grey none. Tiles and map come from the same per-store query
+  and follow the time picker; "days since the first outside login" always looks at the full year.
+- **Act 4:** map by worst finding, tiles, findings grouped by kind beside the map; the chart was dropped. Stores that were only visited are one grouped finding
+  (`first-visit:S01+S02+...`); findings are saved by key, so a prompt change needs `hunt clear` once. The scheduled workflow has a new id after a re-create.
+- **Act 5:** same shape (POS map, four cards, charts against peers, evidence). Panels for the advisory lens were tried here and removed: with the page's fixed
+  three-week window they showed no rows (likely the time range; not confirmed). The lens lives in the agent.
+- **Headlines:** Act 0 "The streetlight effect - we search where the light is", Act 1 "The blip in the Colmar store", Act 2 "Same blip across the entire estate",
+  Act 3 "The history nobody looked at", Act 4 "Let the agent hunt", Act 5 "The POS is now having a PhD and nobody watched it".
+
+## Trucks and the ERP (2026-11-18, synthetic, hypothetical)
+
+Six trucks leave DC Nord and DC Sud; telemetry (position, speed, cargo temperature) goes through S3 like everything else (`logistics.truck`, no destination),
+the destinations are an ERP plan (`kb-erp-deliveries`, loaded by the replay relative to T0). Three frozen trucks reach S07, S11 and S19 about 20, 25 and 35
+minutes after T0. One query joins cabinets, trucks and the ERP (`INLINE STATS` over a union): a store is in trouble when at least 8 frozen cabinets have the
+setpoint raised or the air above -18 C with no defrost. A card on Act 2 was removed; the agent and the hunt raise the finding. A window-based "warm, no
+defrost" count gave false positives from defrost tails; the tile counts stores that rule 2 alerted on. Caveats: a store has a cold room, the ERP feed is an
+integration in reality, the GPS path is a straight line.
+
+## Advisory lens: ask the endpoints (2026-11-19, synthetic, hypothetical)
+
+A real BSI warning (BITS-H 2026-306673-1032, OpenJDK "Java4Shell") is used as an exposure check, never as the cause. Answers of an Osquery live query are
+simulated (software, CPU flags, process command lines; 40 agent-capable devices, 36 answer, S12 and S16 are offline). **Advisories are data**
+(`config/advisories.yaml` -> `kb-advisories`): the agent's and the hunt's prompts and the tool queries name no vulnerability or product (a test enforces it);
+a second advisory is one new entry. Honest limits: live queries need Fleet-managed agents (a second channel next to the S3 data path), only reachable agents
+answer, the CPU-flag table must be tested per platform, no confirmed API for the agent to launch a live query on Serverless. See `docs/advisory-lens.md`.
+
+## Operations learned (2026-11-19)
+
+- `make reset-demo SINCE=...` also clears the truck telemetry, the ERP plan and the Osquery answers; the pre-roll of a later demo can be extended
+  (`python -m coldchain.prep 60 --preroll-hours 40`) to fill a gap after a reset.
+- A lookup index that starts empty needs its fields mapped (`LOOKUP_PROPERTIES`), or joins on it fail.
+- The agent's scripted question takes about 70 seconds; one run timed out at 10 minutes (not reproduced).

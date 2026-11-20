@@ -41,7 +41,7 @@ the most visual act. The risk is time: it adds about a minute and the story alre
 - It fits Elastic's strengths: geo, joins across indices, time series, and an agent that can reason over several sources.
 
 **Caveats to say out loud.**
-- A real store has a cold room and a back room, so a warm cabinet is not automatically a lost load. The card proposes unloading into the cold room.
+- A real store has a cold room and a back room, so a warm cabinet is not automatically a lost load. The agent proposes unloading into the cold room.
 - A real ERP does not expose a clean lookup table: in practice this is an integration (SAP, a WMS or a TMS export). The demo's table is the shape of that feed.
 - Telematics rarely knows its next stop; the join to the ERP is exactly the value. Reefer trailers do report cargo temperature (this is real).
 - The GPS path is a straight line between towns, not a road route. The ETA is the ERP's planned arrival, not a prediction.
